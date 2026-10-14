@@ -274,12 +274,14 @@ def configured_registry(
         if definition.settings:
             raise ResponsibilityConfigError("declarative responsibilities do not accept settings")
         try:
-            declarative.append(DeclarativeResponsibility(
-                id=responsibility_id,
-                check_definitions=definition.configured_checks(responsibility_id),
-                failure_action=definition.failure_action,
-                failure_message=definition.failure_message or definition.context,
-            ))
+            declarative.append(
+                DeclarativeResponsibility(
+                    id=responsibility_id,
+                    check_definitions=definition.configured_checks(responsibility_id),
+                    failure_action=definition.failure_action,
+                    failure_message=definition.failure_message or definition.context,
+                )
+            )
         except ValueError as error:
             raise ResponsibilityConfigError(
                 f"invalid declarative responsibility {responsibility_id}: {error}"
@@ -321,7 +323,8 @@ def configured_registry(
             enabled,
             routes=routes,
             contexts={
-                item.id: context for item in enabled
+                item.id: context
+                for item in enabled
                 if (context := configurations[item.id].context) is not None
             },
         )

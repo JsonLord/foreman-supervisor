@@ -270,9 +270,7 @@ evidence = ["worker", "command.smoke"]
         model=model,
         config=runtime_config,
         worker_factory=lambda _: FakeWorker(output_lines=["done"], delay_seconds=0.03),
-        responsibilities=configured_registry(
-            runtime_config, config_dir=responsibility_dir
-        ),
+        responsibilities=configured_registry(runtime_config, config_dir=responsibility_dir),
     )
 
     state = await runtime.run()

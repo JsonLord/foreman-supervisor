@@ -46,9 +46,12 @@ class DeepAgentsWorker:
     def command(self, mission: str, timeout_seconds: float) -> list[str]:
         command = [
             self.executable,
-            "--max-turns", str(self.max_turns),
-            "--timeout", str(max(1, math.ceil(timeout_seconds))),
-            "--shell-allow-list", self.shell_allow_list,
+            "--max-turns",
+            str(self.max_turns),
+            "--timeout",
+            str(max(1, math.ceil(timeout_seconds))),
+            "--shell-allow-list",
+            self.shell_allow_list,
         ]
         if self.model is not None:
             command.extend(["--model", self.model])
@@ -70,12 +73,15 @@ class DeepAgentsWorker:
             text = decoder.decode(chunk, final=not chunk)
             if text:
                 current = getattr(record, stream_name)
-                setattr(record, stream_name, (current + text)[-self.output_limit:])
-                await emit(EventType.WORKER_OUTPUT, {
-                    "worker_id": record.worker_id,
-                    "stream": stream_name,
-                    "line": text.rstrip()[-4_000:],
-                })
+                setattr(record, stream_name, (current + text)[-self.output_limit :])
+                await emit(
+                    EventType.WORKER_OUTPUT,
+                    {
+                        "worker_id": record.worker_id,
+                        "stream": stream_name,
+                        "line": text.rstrip()[-4_000:],
+                    },
+                )
             if not chunk:
                 break
 
@@ -112,7 +118,7 @@ class DeepAgentsWorker:
                 f"failed to launch Deep Agents Code: {error}. Install deepagents-code>=0.1.83 "
                 "with Python 3.12+ and ensure dcode is on PATH, or set "
                 "FOREMAN_DEEPAGENTS_EXECUTABLE."
-            )[-self.output_limit:]
+            )[-self.output_limit :]
             record.termination_reason = "launch_failed"
             return record
 
@@ -186,8 +192,14 @@ class DeepAgentsWorker:
         probe = None
         try:
             probe = await asyncio.create_subprocess_exec(
-                "ps", "-e", "-o", "pid=", "-o", "ppid=",
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+                "ps",
+                "-e",
+                "-o",
+                "pid=",
+                "-o",
+                "ppid=",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
                 env=worker_environment(),
             )
             output, _ = await asyncio.wait_for(probe.communicate(), timeout=2)
@@ -222,8 +234,13 @@ class DeepAgentsWorker:
             return
         if os.name == "nt":
             killer = await asyncio.create_subprocess_exec(
-                "taskkill", "/PID", str(process.pid), "/T", "/F",
-                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+                "taskkill",
+                "/PID",
+                str(process.pid),
+                "/T",
+                "/F",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
             )
             await killer.wait()
             await process.wait()

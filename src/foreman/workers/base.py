@@ -14,9 +14,9 @@ def worker_environment() -> dict[str, str]:
     """Return the inherited environment without Foreman's supervisor credentials."""
 
     return {
-        name: value for name, value in os.environ.items()
-        if not name.startswith("TYPESAFE_")
-        and not name.startswith("FOREMAN_LAYA_")
+        name: value
+        for name, value in os.environ.items()
+        if not name.startswith("TYPESAFE_") and not name.startswith("FOREMAN_LAYA_")
     }
 
 

@@ -1,4 +1,5 @@
 """Offline Jev doubles behind the real Foreman process protocol."""
+
 from foreman import cli
 from foreman.models import ForemanResult
 from foreman.routing import RoutingDecision

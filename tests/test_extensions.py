@@ -401,9 +401,7 @@ def test_extension_cannot_route_builtin_responsibilities(tmp_path) -> None:
         manager.activate(FactoryConfig())
 
 
-def test_extension_login_cli_authenticates_and_synchronizes(
-    tmp_path, monkeypatch
-) -> None:
+def test_extension_login_cli_authenticates_and_synchronizes(tmp_path, monkeypatch) -> None:
     write_config(tmp_path)
     extension = SyncingExtension()
     credentials = MemoryCredentials()

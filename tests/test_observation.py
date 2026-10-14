@@ -92,8 +92,6 @@ async def test_observation_includes_non_secret_routing_bindings(tmp_path) -> Non
 
     observation = await ObservationBuilder(store, FactoryConfig()).build(state)
 
-    assert observation.routing_bindings == {
-        "example.project": {"project_id": "project-123"}
-    }
+    assert observation.routing_bindings == {"example.project": {"project_id": "project-123"}}
     assert observation.active_extension_ids == ["example"]
     assert observation.extension_snapshot_revisions == {"example": "revision-7"}

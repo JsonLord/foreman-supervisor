@@ -3,4 +3,3 @@
 from foreman.runtime import FactoryRuntime
 
 __all__ = ["FactoryRuntime"]
-

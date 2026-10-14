@@ -2,6 +2,7 @@
 
 This is an internal contract, not a claim about Laya's wire format.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -35,7 +36,10 @@ class DecisionProvider(Protocol):
 
 
 def validate_probabilities(
-    values: Mapping[str, Any], questions: Mapping[str, str], *, provider: str,
+    values: Mapping[str, Any],
+    questions: Mapping[str, str],
+    *,
+    provider: str,
     clamp: bool = False,
 ) -> dict[str, float]:
     missing = set(questions) - set(values)
@@ -61,8 +65,12 @@ class JevDecisionProvider:
     """Keep SDK Noul questions, retries, budgets and usage recording unchanged."""
 
     def __init__(
-        self, *, client: Any | None = None, timeout_seconds: float = 10.0,
-        model: str = "jev-latest", usage_recorder: JevUsageRecorder | None = None,
+        self,
+        *,
+        client: Any | None = None,
+        timeout_seconds: float = 10.0,
+        model: str = "jev-latest",
+        usage_recorder: JevUsageRecorder | None = None,
     ) -> None:
         self._client = client
         self._owns_client = client is None
@@ -78,17 +86,21 @@ class JevDecisionProvider:
                 "typesafe-sdk is not installed; install the project dependencies"
             ) from error
         return AsyncTypeSafeClient(
-            model=self.model, timeout=self.timeout_seconds,
+            model=self.model,
+            timeout=self.timeout_seconds,
             retry=RetryPolicy(
-                max_retries=2, http_statuses={429, 500, 502, 503, 504},
-                respect_retry_after=True, timeout=self.timeout_seconds,
+                max_retries=2,
+                http_statuses={429, 500, 502, 503, 504},
+                respect_retry_after=True,
+                timeout=self.timeout_seconds,
             ),
         )
 
     async def assess(self, request: AssessmentRequest) -> AssessmentResult:
         if "evidence_budget" in request.evidence.state:
             logging.getLogger(__name__).info(
-                "Compacted Jev evidence: %s", request.evidence.measurements,
+                "Compacted Jev evidence: %s",
+                request.evidence.measurements,
             )
         try:
             from typesafe_sdk import Noul
@@ -110,12 +122,16 @@ class JevDecisionProvider:
                         key: Noul(instructions=instructions)
                         for key, instructions in request.questions.items()
                     },
-                    model=self.model, timeout=self.timeout_seconds,
+                    model=self.model,
+                    timeout=self.timeout_seconds,
                 ),
                 timeout=self.timeout_seconds + 0.5,
             )
             self.usage_recorder.record(
-                response, request.evidence, purpose=request.purpose, model=self.model,
+                response,
+                request.evidence,
+                purpose=request.purpose,
+                model=self.model,
             )
             values = {}
             nouls = getattr(response, "nouls", None)
@@ -133,9 +149,14 @@ class JevDecisionProvider:
                             values[key] = answer.get("noul")
                         elif answer is not None:
                             values[key] = answer
-            return AssessmentResult(validate_probabilities(
-                values, request.questions, provider="Jev", clamp=True,
-            ))
+            return AssessmentResult(
+                validate_probabilities(
+                    values,
+                    request.questions,
+                    provider="Jev",
+                    clamp=True,
+                )
+            )
         except TimeoutError as error:
             raise ForemanModelError(f"Jev {request.purpose} timed out") from error
         except ForemanModelError:

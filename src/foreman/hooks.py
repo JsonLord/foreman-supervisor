@@ -77,9 +77,7 @@ class HookEvent(BaseModel):
 
     @model_validator(mode="after")
     def required_event_fields(self) -> HookEvent:
-        if self.kind is HookEventKind.WORK_SUBMITTED and not (
-            self.prompt and self.prompt.strip()
-        ):
+        if self.kind is HookEventKind.WORK_SUBMITTED and not (self.prompt and self.prompt.strip()):
             raise ValueError("work_submitted requires a non-empty prompt")
         if (
             self.kind in {HookEventKind.BEFORE_TOOL, HookEventKind.AFTER_TOOL}
@@ -408,10 +406,14 @@ class AttachedWorkerRuntime:
                             != self.extension_snapshot_revisions
                         ):
                             raise HookError("extension snapshots changed; submit new work")
-                        output = HookOutcome(
-                            action=HookAction.INJECT_CONTEXT,
-                            reason=session.routed_context,
-                        ) if session.routed_context else HookOutcome()
+                        output = (
+                            HookOutcome(
+                                action=HookAction.INJECT_CONTEXT,
+                                reason=session.routed_context,
+                            )
+                            if session.routed_context
+                            else HookOutcome()
+                        )
                     else:
                         output = await self._route_prompt(session, event)
                         session.work_id = event.work_id
@@ -427,13 +429,10 @@ class AttachedWorkerRuntime:
                 if session.state is None:
                     if session.prompt_routed and not self.candidates.global_ids():
                         return HookOutcome()
-                    raise HookError(
-                        f"{event.source_event_name} arrived before work_submitted"
-                    )
+                    raise HookError(f"{event.source_event_name} arrived before work_submitted")
                 if (
                     session.state.active_extension_ids != list(self.active_extension_ids)
-                    or
-                    session.state.extension_snapshot_revisions
+                    or session.state.extension_snapshot_revisions
                     != self.extension_snapshot_revisions
                 ):
                     raise HookError(
@@ -441,11 +440,13 @@ class AttachedWorkerRuntime:
                         "submit the work prompt again"
                     )
                 if event.kind is HookEventKind.WORKER_STOPPING and session.work_id is not None:
-                    event = event.model_copy(update={
-                        "continuation_active": (
-                            event.continuation_active or session.continuation_requested
-                        ),
-                    })
+                    event = event.model_copy(
+                        update={
+                            "continuation_active": (
+                                event.continuation_active or session.continuation_requested
+                            ),
+                        }
+                    )
                 output = await self._assess_event(session, event)
                 if (
                     event.kind is HookEventKind.WORKER_STOPPING
@@ -455,11 +456,13 @@ class AttachedWorkerRuntime:
                     session.continuation_requested = True
 
             if event.event_id is not None:
-                session.replayed_outcomes.append({
-                    "event_id": event.event_id,
-                    "fingerprint": fingerprint,
-                    "outcome": output.model_dump(mode="json"),
-                })
+                session.replayed_outcomes.append(
+                    {
+                        "event_id": event.event_id,
+                        "fingerprint": fingerprint,
+                        "outcome": output.model_dump(mode="json"),
+                    }
+                )
                 session.replayed_outcomes = session.replayed_outcomes[
                     -self.config.event_history_limit :
                 ]
@@ -468,9 +471,7 @@ class AttachedWorkerRuntime:
             self.store.save(session)
             return output
 
-    async def _route_prompt(
-        self, session: AttachedSession, event: HookEvent
-    ) -> HookOutcome:
+    async def _route_prompt(self, session: AttachedSession, event: HookEvent) -> HookOutcome:
         assert event.prompt is not None
         decision = await resolve_hierarchical_routing(
             event.prompt.strip(),
@@ -487,7 +488,8 @@ class AttachedWorkerRuntime:
                 return HookOutcome()
             raise ResponsibilityRoutingError("routing activated no responsibilities")
         guidance = "\n\n".join(
-            text for responsibility_id in active_ids
+            text
+            for responsibility_id in active_ids
             if (text := self.candidates.context_for(responsibility_id))
         )
         if len(guidance) > self.config.field_limit:
@@ -549,9 +551,7 @@ class AttachedWorkerRuntime:
             + (f"\n\n{guidance}" if guidance else ""),
         )
 
-    async def _assess_event(
-        self, session: AttachedSession, event: HookEvent
-    ) -> HookOutcome:
+    async def _assess_event(self, session: AttachedSession, event: HookEvent) -> HookOutcome:
         state = session.state
         assert state is not None
         active = self.candidates.routed(state.active_responsibility_ids)
@@ -567,9 +567,7 @@ class AttachedWorkerRuntime:
             worker.finished_at = datetime.now(UTC)
             state.active_workers = []
             state.completed_workers = [worker.worker_id]
-            providers = selected_command_evidence(
-                active.checks(), self.config.command_evidence
-            )
+            providers = selected_command_evidence(active.checks(), self.config.command_evidence)
             results = await run_command_evidence_providers(
                 providers,
                 Path(state.repository),
@@ -592,8 +590,13 @@ class AttachedWorkerRuntime:
             current_operation=event.model_dump(
                 mode="json",
                 include={
-                    "client", "kind", "source_event_name", "turn_id", "tool_name",
-                    "tool_use_id", "tool_input",
+                    "client",
+                    "kind",
+                    "source_event_name",
+                    "turn_id",
+                    "tool_name",
+                    "tool_use_id",
+                    "tool_input",
                 },
                 exclude_none=True,
             ),

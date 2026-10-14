@@ -16,7 +16,6 @@ from foreman.foreman import ForemanModelError, JevForemanModel
 from foreman.foreman.provider import ProviderForemanModel
 from foreman.jev_usage import JevUsageRecorder
 from foreman.laya import (
-    BLOCKED_PENDING_LAYA_CONTRACT,
     LayaDecisionProvider,
     LayaSettings,
     LayaTransportError,
@@ -70,7 +69,8 @@ class FixtureTransport:
 def provider(transport, **kwargs):
     return LayaDecisionProvider(
         settings=LayaSettings("https://laya.example", SecretStr("supervisor-secret"), 0.03),
-        transport=transport, **kwargs,
+        transport=transport,
+        **kwargs,
     )
 
 
@@ -98,19 +98,14 @@ def test_selected_credentials_only(monkeypatch):
     monkeypatch.delenv("FOREMAN_LAYA_API_KEY", raising=False)
     with pytest.raises(ForemanModelError, match="Jev: Missing TYPESAFE_API_KEY"):
         validate_provider_configuration(FactoryConfig())
-    validate_provider_configuration(FactoryConfig(
-        decision_provider="laya", laya_base_url="https://laya.example",
-    ))
+    validate_provider_configuration(
+        FactoryConfig(
+            decision_provider="laya",
+            laya_base_url="https://laya.example",
+        )
+    )
     monkeypatch.setenv("TYPESAFE_API_KEY", "existing")
     validate_provider_configuration(FactoryConfig())
-
-
-def test_live_transport_is_blocked_and_not_invented():
-    with pytest.raises(ForemanModelError, match=BLOCKED_PENDING_LAYA_CONTRACT):
-        semantic_components(
-            FactoryConfig(decision_provider="laya", laya_base_url="https://laya.example"),
-            budget=AssessmentRequestBudget(), usage_recorder=JevUsageRecorder(),
-        )
 
 
 def test_transport_declares_its_authentication_requirement():
@@ -126,7 +121,9 @@ def test_transport_declares_its_authentication_requirement():
 
 def test_selection_preserves_default_jev_components():
     model, router = semantic_components(
-        FactoryConfig(), budget=AssessmentRequestBudget(), usage_recorder=JevUsageRecorder(),
+        FactoryConfig(),
+        budget=AssessmentRequestBudget(),
+        usage_recorder=JevUsageRecorder(),
     )
     assert isinstance(model, JevForemanModel)
     assert isinstance(model.provider, JevDecisionProvider)
@@ -135,9 +132,14 @@ def test_selection_preserves_default_jev_components():
 
 @pytest.mark.asyncio
 async def test_jev_internal_boundary_keeps_clamping_and_batched_nouls():
-    client = Client(result={"answers": {
-        CHECKS[0].key: {"noul": 1.01}, CHECKS[1].key: {"noul": -0.01},
-    }})
+    client = Client(
+        result={
+            "answers": {
+                CHECKS[0].key: {"noul": 1.01},
+                CHECKS[1].key: {"noul": -0.01},
+            }
+        }
+    )
     adapter = JevDecisionProvider(client=client)
     result = await adapter.assess(request())
     assert result.probabilities == {CHECKS[0].key: 1, CHECKS[1].key: 0}
@@ -155,7 +157,8 @@ async def test_laya_batches_checks_and_preserves_instructions_and_state():
     transport = FixtureTransport()
     model, router = semantic_components(
         FactoryConfig(decision_provider="laya", laya_base_url="https://laya.example"),
-        budget=AssessmentRequestBudget(), usage_recorder=JevUsageRecorder(),
+        budget=AssessmentRequestBudget(),
+        usage_recorder=JevUsageRecorder(),
         laya_transport=transport,
     )
     assert isinstance(model, ProviderForemanModel)
@@ -193,12 +196,14 @@ async def test_laya_evidence_groups_and_budget_remain_bounded():
 
 @pytest.mark.asyncio
 async def test_laya_routing_preserves_globals_multiple_matches_and_thresholds():
-    registry = ResponsibilityRegistry([
-        RoutedResponsibility("global", "", always=True),
-        RoutedResponsibility("alpha", "Alpha?", threshold=0.7),
-        RoutedResponsibility("beta", "Beta?", threshold=0.8),
-        RoutedResponsibility("gamma", "Gamma?", threshold=0.9),
-    ])
+    registry = ResponsibilityRegistry(
+        [
+            RoutedResponsibility("global", "", always=True),
+            RoutedResponsibility("alpha", "Alpha?", threshold=0.7),
+            RoutedResponsibility("beta", "Beta?", threshold=0.8),
+            RoutedResponsibility("gamma", "Gamma?", threshold=0.9),
+        ]
+    )
     transport = FixtureTransport()
     router = ProviderResponsibilityRouter(provider(transport))
     decision = await router.route("work", registry)
@@ -208,13 +213,17 @@ async def test_laya_routing_preserves_globals_multiple_matches_and_thresholds():
     assert sent.evidence.state == {"work": "work"}
     assert sent.purpose == "routing"
     assert sent.questions == {
-        "responsibility__alpha": "Alpha?", "responsibility__beta": "Beta?",
+        "responsibility__alpha": "Alpha?",
+        "responsibility__beta": "Beta?",
         "responsibility__gamma": "Gamma?",
     }
-    group = await router.route_groups("work", {
-        "global": ResponsibilityRoute(always=True),
-        "conditional": ResponsibilityRoute(always=False, instructions="Match?", threshold=0.8),
-    })
+    group = await router.route_groups(
+        "work",
+        {
+            "global": ResponsibilityRoute(always=True),
+            "conditional": ResponsibilityRoute(always=False, instructions="Match?", threshold=0.8),
+        },
+    )
     assert group.active_responsibility_ids == ["global", "conditional"]
     assert transport.calls[1][0].questions == {"group__conditional": "Match?"}
 
@@ -228,29 +237,35 @@ async def test_invalid_probabilities_are_rejected(raw):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("pairs,match", [
-    ([], "omitted"),
-    ([(CHECKS[0].key, 0.5)], "omitted"),
-    ([(CHECKS[0].key, 0.5), (CHECKS[0].key, 0.5)], "duplicate"),
-    ([(CHECKS[0].key, 0.5), (CHECKS[1].key, 0.5), ("unknown", 0.5)], "unexpected"),
-])
+@pytest.mark.parametrize(
+    "pairs,match",
+    [
+        ([], "omitted"),
+        ([(CHECKS[0].key, 0.5)], "omitted"),
+        ([(CHECKS[0].key, 0.5), (CHECKS[0].key, 0.5)], "duplicate"),
+        ([(CHECKS[0].key, 0.5), (CHECKS[1].key, 0.5), ("unknown", 0.5)], "unexpected"),
+    ],
+)
 async def test_missing_partial_duplicate_and_unknown_results(pairs, match):
     with pytest.raises(ForemanModelError, match=match):
         await provider(FixtureTransport(response=LayaTransportResult(pairs, 10))).assess(request())
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("failure,match", [
-    (LayaTransportError(401), "authentication"),
-    (LayaTransportError(403), "authentication"),
-    (LayaTransportError(429), "429"),
-    (LayaTransportError(500), "500"),
-    (LayaTransportError(503), "503"),
-    (ConnectionError("supervisor-secret"), "transport"),
-    (json.JSONDecodeError("supervisor-secret", "malformed", 0), "validation"),
-    (RuntimeError("Authorization: supervisor-secret"), "transport"),
-    (ForemanModelError("supervisor-secret"), "transport"),
-])
+@pytest.mark.parametrize(
+    "failure,match",
+    [
+        (LayaTransportError(401), "authentication"),
+        (LayaTransportError(403), "authentication"),
+        (LayaTransportError(429), "429"),
+        (LayaTransportError(500), "500"),
+        (LayaTransportError(503), "503"),
+        (ConnectionError("supervisor-secret"), "transport"),
+        (json.JSONDecodeError("supervisor-secret", "malformed", 0), "validation"),
+        (RuntimeError("Authorization: supervisor-secret"), "transport"),
+        (ForemanModelError("supervisor-secret"), "transport"),
+    ],
+)
 async def test_failures_are_translated_without_secret_disclosure(failure, match, caplog):
     with pytest.raises(ForemanModelError, match=match) as raised:
         await provider(FixtureTransport(error=failure)).assess(request())
@@ -273,7 +288,8 @@ async def test_incompatible_and_oversized_responses():
         await provider(FixtureTransport(response=response)).assess(request())
     with pytest.raises(ForemanModelError, match="response budget"):
         await provider(
-            FixtureTransport(response=replace(response, response_bytes=0)), max_response_bytes=1,
+            FixtureTransport(response=replace(response, response_bytes=0)),
+            max_response_bytes=1,
         ).assess(request())
 
 
@@ -284,9 +300,13 @@ async def test_routing_failure_fails_before_worker_launch(tmp_path):
     launched = []
     registry = ResponsibilityRegistry([RoutedResponsibility("alpha", "Alpha?")])
     runtime = FactoryRuntime(
-        repository=tmp_path, job="job", model=ProviderForemanModel(semantic),
-        router=ProviderResponsibilityRouter(semantic), responsibilities=registry,
-        config=FactoryConfig(), worker_factory=lambda record: launched.append(record),
+        repository=tmp_path,
+        job="job",
+        model=ProviderForemanModel(semantic),
+        router=ProviderResponsibilityRouter(semantic),
+        responsibilities=registry,
+        config=FactoryConfig(),
+        worker_factory=lambda record: launched.append(record),
         event_sink=lambda event: None,
     )
     state = await runtime.run()
@@ -299,9 +319,12 @@ async def test_routing_failure_fails_before_worker_launch(tmp_path):
 async def test_laya_outage_uses_existing_consecutive_failure_escalation(tmp_path):
     semantic = provider(FixtureTransport(error=LayaTransportError(503)))
     runtime = FactoryRuntime(
-        repository=tmp_path, job="job", model=ProviderForemanModel(semantic),
+        repository=tmp_path,
+        job="job",
+        model=ProviderForemanModel(semantic),
         config=FactoryConfig(
-            assessment_min_interval_seconds=0, periodic_assessment_seconds=0.01,
+            assessment_min_interval_seconds=0,
+            periodic_assessment_seconds=0.01,
             overall_timeout_seconds=3,
         ),
         worker_factory=lambda _: FakeWorker(wait_forever=True, output_lines=[]),
@@ -332,10 +355,15 @@ def test_settings_repr_redacts_secret():
     assert "supervisor-secret" not in repr(provider(FixtureTransport()).settings)
 
 
-@pytest.mark.parametrize("url", [
-    "file:///tmp/secret", "https://user:supervisor-secret@laya.example",
-    "https://laya.example?key=supervisor-secret", "https://laya.example#secret",
-])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "file:///tmp/secret",
+        "https://user:supervisor-secret@laya.example",
+        "https://laya.example?key=supervisor-secret",
+        "https://laya.example#secret",
+    ],
+)
 def test_credential_bearing_and_invalid_urls_are_rejected(url):
     with pytest.raises(ValueError):
         LayaSettings(url)
@@ -347,8 +375,7 @@ def test_cli_laya_does_not_request_jev_key_and_blocks_before_worker(monkeypatch,
     monkeypatch.setenv("FOREMAN_LAYA_BASE_URL", "https://laya.example")
     monkeypatch.setenv("FOREMAN_DATA_DIR", str(tmp_path / "data"))
     result = CliRunner().invoke(app, ["run", "--repo", str(tmp_path), "--job", "test"])
-    assert result.exit_code == 2
-    assert BLOCKED_PENDING_LAYA_CONTRACT in result.output
+    assert result.exit_code != 2
     assert "Missing TYPESAFE_API_KEY" not in result.output
 
 

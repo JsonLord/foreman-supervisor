@@ -74,9 +74,7 @@ from foreman.test_summary import (
         ),
     ],
 )
-def test_parse_pytest_summary_line_exact_outcomes(
-    line: str, expected: PytestSummary
-) -> None:
+def test_parse_pytest_summary_line_exact_outcomes(line: str, expected: PytestSummary) -> None:
     assert parse_pytest_summary_line(line) == expected
 
 

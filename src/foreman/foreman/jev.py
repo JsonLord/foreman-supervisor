@@ -62,13 +62,19 @@ class JevForemanModel(ProviderForemanModel):
     """Backward-compatible Jev model using the generic semantic boundary."""
 
     def __init__(
-        self, *, client: Any | None = None, timeout_seconds: float = 10.0,
-        model: str = "jev-latest", budget: JevRequestBudget | None = None,
+        self,
+        *,
+        client: Any | None = None,
+        timeout_seconds: float = 10.0,
+        model: str = "jev-latest",
+        budget: JevRequestBudget | None = None,
         usage_recorder: JevUsageRecorder | None = None,
     ) -> None:
         super().__init__(
             JevDecisionProvider(
-                client=client, timeout_seconds=timeout_seconds, model=model,
+                client=client,
+                timeout_seconds=timeout_seconds,
+                model=model,
                 usage_recorder=usage_recorder,
             ),
             budget=budget,

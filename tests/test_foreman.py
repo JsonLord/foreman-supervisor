@@ -135,9 +135,7 @@ async def test_jev_groups_checks_by_their_exact_evidence_lists() -> None:
         Check("example", "diff", "Judge the diff", evidence=("git.diff",)),
         Check("example", "worker", "Judge the worker", evidence=("worker",)),
     )
-    response = SimpleNamespace(
-        nouls={check.key: SimpleNamespace(noul=0.6) for check in checks}
-    )
+    response = SimpleNamespace(nouls={check.key: SimpleNamespace(noul=0.6) for check in checks})
     client = Client(result=response)
 
     result = await JevForemanModel(client=client).assess(observation(), checks)

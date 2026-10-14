@@ -29,7 +29,12 @@ class JevUsageRecorder:
         self.path = path
 
     def record(
-        self, response: Any, request: BudgetedRequest, *, purpose: str, model: str,
+        self,
+        response: Any,
+        request: BudgetedRequest,
+        *,
+        purpose: str,
+        model: str,
     ) -> None:
         usage = _field(response, "usage")
         returned_model = _field(response, "model")

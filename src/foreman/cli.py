@@ -100,8 +100,9 @@ def _extension_manager(data_dir: Path | None) -> ExtensionManager:
 def deepagents_setup(
     hooks_file: Annotated[
         Path | None,
-        typer.Option("--hooks-file", dir_okay=False,
-                     help="Hooks v2 file (default: ~/.deepagents/hooks.json)"),
+        typer.Option(
+            "--hooks-file", dir_okay=False, help="Hooks v2 file (default: ~/.deepagents/hooks.json)"
+        ),
     ] = None,
     foreman_executable: Annotated[
         str | None,
@@ -282,9 +283,7 @@ def hook(
             data_dir=central_data_dir,
             config_path=central_config_path,
         )
-        config = config.model_copy(
-            update={"command_evidence": extensions.config.evidence.commands}
-        )
+        config = config.model_copy(update={"command_evidence": extensions.config.evidence.commands})
         activated = extensions.activate(config)
         registrations = activated.responsibilities
         responsibilities = configured_registry(
@@ -300,14 +299,18 @@ def hook(
             sys.stdout.write("{}\n")
             return
         budget = JevRequestBudget(
-            config.jev_pair_budget_bytes, config.jev_request_budget_bytes,
+            config.jev_pair_budget_bytes,
+            config.jev_request_budget_bytes,
             target_pair_bytes=config.jev_pair_target_bytes,
             target_total_bytes=config.jev_request_target_bytes,
         )
         usage_recorder = JevUsageRecorder(central_data_dir / "jev-usage.jsonl")
         model, router = semantic_components(
-            config, budget=budget, usage_recorder=usage_recorder,
-            jev_model_factory=JevForemanModel, jev_router_factory=JevResponsibilityRouter,
+            config,
+            budget=budget,
+            usage_recorder=usage_recorder,
+            jev_model_factory=JevForemanModel,
+            jev_router_factory=JevResponsibilityRouter,
         )
         runtime = AttachedWorkerRuntime(
             model=model,
@@ -409,28 +412,28 @@ def run(
             data_dir=central_data_dir,
             config_path=central_config_path,
         )
-        config = config.model_copy(
-            update={"command_evidence": extensions.config.evidence.commands}
-        )
+        config = config.model_copy(update={"command_evidence": extensions.config.evidence.commands})
         activated = extensions.activate(config)
         registrations = activated.responsibilities
         responsibilities = configured_registry(
             config,
             config_dir=central_responsibilities_dir,
             additional=(item.implementation for item in registrations),
-            additional_configs={
-                item.implementation.id: item.definition for item in registrations
-            },
+            additional_configs={item.implementation.id: item.definition for item in registrations},
         )
         budget = JevRequestBudget(
-            config.jev_pair_budget_bytes, config.jev_request_budget_bytes,
+            config.jev_pair_budget_bytes,
+            config.jev_request_budget_bytes,
             target_pair_bytes=config.jev_pair_target_bytes,
             target_total_bytes=config.jev_request_target_bytes,
         )
         usage_recorder = JevUsageRecorder(extensions.data_dir / "jev-usage.jsonl")
         model, router = semantic_components(
-            config, budget=budget, usage_recorder=usage_recorder,
-            jev_model_factory=JevForemanModel, jev_router_factory=JevResponsibilityRouter,
+            config,
+            budget=budget,
+            usage_recorder=usage_recorder,
+            jev_model_factory=JevForemanModel,
+            jev_router_factory=JevResponsibilityRouter,
         )
         runtime = FactoryRuntime(
             repository=repo,

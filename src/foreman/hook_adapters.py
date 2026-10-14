@@ -56,10 +56,14 @@ class CodexHookInput(BaseModel):
             self.prompt and self.prompt.strip()
         ):
             raise ValueError("UserPromptSubmit requires a non-empty prompt")
-        if self.hook_event_name in {
-            CodexHookEventName.PRE_TOOL_USE,
-            CodexHookEventName.POST_TOOL_USE,
-        } and not self.tool_name:
+        if (
+            self.hook_event_name
+            in {
+                CodexHookEventName.PRE_TOOL_USE,
+                CodexHookEventName.POST_TOOL_USE,
+            }
+            and not self.tool_name
+        ):
             raise ValueError(f"{self.hook_event_name.value} requires tool_name")
         return self
 
@@ -134,8 +138,13 @@ class DeepAgentsHookInput(BaseModel):
     session_id: str = Field(min_length=1, max_length=1_000)
     cwd: str = Field(min_length=1)
     hook_event_name: Literal[
-        "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
-        "PostToolUseFailure", "Stop", "SessionEnd",
+        "SessionStart",
+        "UserPromptSubmit",
+        "PreToolUse",
+        "PostToolUse",
+        "PostToolUseFailure",
+        "Stop",
+        "SessionEnd",
     ]
     prompt_id: str | None = Field(default=None, min_length=1, max_length=1_000)
     prompt: str | None = None
@@ -150,9 +159,7 @@ class DeepAgentsHookInput(BaseModel):
 
     @model_validator(mode="after")
     def required_deepagents_fields(self) -> DeepAgentsHookInput:
-        if self.hook_event_name == "UserPromptSubmit" and not (
-            self.prompt and self.prompt.strip()
-        ):
+        if self.hook_event_name == "UserPromptSubmit" and not (self.prompt and self.prompt.strip()):
             raise ValueError("UserPromptSubmit requires a non-empty prompt")
         if self.hook_event_name in {"PreToolUse", "PostToolUse", "PostToolUseFailure"}:
             if not self.tool_name or not self.tool_use_id:
@@ -258,10 +265,16 @@ class PiHookAdapter:
                 tool_name=call.get("name" if durable else "toolName"),
                 tool_use_id=call.get("id" if durable else "toolCallId"),
                 tool_input=call.get("arguments" if durable else "input"),
-                tool_response=native.get("result") if durable else (
-                    {key: native[key]
-                     for key in ("content", "details", "structuredContent", "isError")
-                     if key in native} if name == "tool_result" else None
+                tool_response=native.get("result")
+                if durable
+                else (
+                    {
+                        key: native[key]
+                        for key in ("content", "details", "structuredContent", "isError")
+                        if key in native
+                    }
+                    if name == "tool_result"
+                    else None
                 ),
                 continuation_active=source.continuation_active,
                 last_assistant_message=native.get("last_assistant_message"),

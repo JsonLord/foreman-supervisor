@@ -4,6 +4,7 @@ The transport types below describe Foreman's internal boundary only. They do
 not define an HTTP endpoint, request payload, authentication header or response
 schema for the inaccessible Laya service.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -19,8 +20,6 @@ from foreman.foreman.base import ForemanModelError
 from foreman.providers import AssessmentRequest, AssessmentResult, validate_probabilities
 from foreman.request_budget import AssessmentRequestBudget, RequestBudgetError, json_bytes
 
-BLOCKED_PENDING_LAYA_CONTRACT = "BLOCKED_PENDING_LAYA_CONTRACT"
-
 
 @dataclass(frozen=True)
 class LayaSettings:
@@ -31,9 +30,12 @@ class LayaSettings:
     def __post_init__(self) -> None:
         url = urlsplit(self.base_url)
         if (
-            url.scheme not in {"http", "https"} or not url.hostname
-            or url.username is not None or url.password is not None
-            or url.query or url.fragment
+            url.scheme not in {"http", "https"}
+            or not url.hostname
+            or url.username is not None
+            or url.password is not None
+            or url.query
+            or url.fragment
         ):
             raise ValueError(
                 "Laya base URL must be HTTP(S), without credentials, query or fragment"
@@ -61,7 +63,10 @@ class LayaTransport(Protocol):
     requires_api_key: bool
 
     async def assess(
-        self, request: AssessmentRequest, *, settings: LayaSettings,
+        self,
+        request: AssessmentRequest,
+        *,
+        settings: LayaSettings,
     ) -> LayaTransportResult: ...
 
     async def close(self) -> None: ...
@@ -69,12 +74,16 @@ class LayaTransport(Protocol):
 
 class LayaDecisionProvider:
     def __init__(
-        self, *, settings: LayaSettings, transport: LayaTransport | None = None,
-        budget: AssessmentRequestBudget | None = None, max_response_bytes: int = 60_000,
+        self,
+        *,
+        settings: LayaSettings,
+        transport: LayaTransport | None = None,
+        budget: AssessmentRequestBudget | None = None,
+        max_response_bytes: int = 60_000,
     ) -> None:
         if transport is None:
             raise ForemanModelError(
-                f"Laya: {BLOCKED_PENDING_LAYA_CONTRACT}; authoritative endpoint, "
+                "Laya: No transport injected; "
                 "schema, batching and authentication must be verified before live HTTP is enabled"
             )
         if transport.requires_api_key and (

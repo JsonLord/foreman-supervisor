@@ -24,7 +24,10 @@ def json_bytes(value: Any) -> int:
 
 
 def _text_candidates(
-    value: Any, field: str, parent: Any, key: Any,
+    value: Any,
+    field: str,
+    parent: Any,
+    key: Any,
     candidates: list[tuple[int, str, Any, Any, str]],
 ) -> None:
     if isinstance(value, str) and len(value) > 256:
@@ -39,12 +42,23 @@ def _text_candidates(
 
 # These fields must never be truncated by the request budget. Other evidence
 # may be shortened, with explicit omission markers visible to the assessor.
-PROTECTED_FIELDS = frozenset({
-    "original_job", "work", "current_operation", "agents_md_path",
-    "agents_md_instructions", "routing_bindings", "active_extension_ids",
-    "extension_snapshot_revisions", "run_id", "factory_status", "iteration",
-    "attempts", "elapsed_factory_seconds",
-})
+PROTECTED_FIELDS = frozenset(
+    {
+        "original_job",
+        "work",
+        "current_operation",
+        "agents_md_path",
+        "agents_md_instructions",
+        "routing_bindings",
+        "active_extension_ids",
+        "extension_snapshot_revisions",
+        "run_id",
+        "factory_status",
+        "iteration",
+        "attempts",
+        "elapsed_factory_seconds",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -71,7 +85,9 @@ class JevRequestBudget:
             raise ValueError("Jev byte targets must be positive and below the model defaults")
 
     def measure(
-        self, state: Mapping[str, Any], questions: Mapping[str, str],
+        self,
+        state: Mapping[str, Any],
+        questions: Mapping[str, str],
     ) -> dict[str, int]:
         payloads = {
             key: {"type": "noul", "instructions": value, "criteria": None}
@@ -90,7 +106,11 @@ class JevRequestBudget:
         return sizes["pair_bytes"] <= pair and sizes["total_bytes"] <= total
 
     def fit(
-        self, state: Mapping[str, Any], questions: Mapping[str, str], *, compact: bool = True,
+        self,
+        state: Mapping[str, Any],
+        questions: Mapping[str, str],
+        *,
+        compact: bool = True,
     ) -> BudgetedRequest:
         result = copy.deepcopy(dict(state))
         original = self.measure(result, questions)
@@ -126,8 +146,11 @@ class JevRequestBudget:
 
         sizes = record()
         essential = self.measure(
-            {key: value for key, value in result.items()
-             if key in PROTECTED_FIELDS or key == "evidence_budget"},
+            {
+                key: value
+                for key, value in result.items()
+                if key in PROTECTED_FIELDS or key == "evidence_budget"
+            },
             questions,
         )
         # A soft target must never reject essential context. If it cannot fit,
@@ -167,7 +190,8 @@ class JevRequestBudget:
             # Even compact structures can grow large. Explicitly remove optional
             # fields as a last resort; the required state remains intact.
             optional = [
-                field for field in result
+                field
+                for field in result
                 if field not in PROTECTED_FIELDS and field != "evidence_budget"
             ]
             for field in sorted(optional, key=lambda key: json_bytes(result[key]), reverse=True):

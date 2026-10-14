@@ -276,9 +276,7 @@ async def resolve_hierarchical_routing(
         selected.update(group.id for group in level if group.route.always)
         if selection is RouteSelection.BEST_MATCH:
             conditional = [
-                group
-                for group in level
-                if not group.route.always and group.id in selected
+                group for group in level if not group.route.always and group.id in selected
             ]
             if conditional:
                 winner = max(conditional, key=lambda group: decision.scores.get(group.id, -1.0))
@@ -328,7 +326,10 @@ class ProviderResponsibilityRouter:
     """Use batched semantic scores with the existing deterministic route selection."""
 
     def __init__(
-        self, provider: DecisionProvider, *, budget: JevRequestBudget | None = None,
+        self,
+        provider: DecisionProvider,
+        *,
+        budget: JevRequestBudget | None = None,
     ) -> None:
         self.provider = provider
         self.budget = budget or JevRequestBudget()
@@ -385,7 +386,11 @@ class ProviderResponsibilityRouter:
         )
 
     async def _score(
-        self, work: str, routes: Mapping[str, ResponsibilityRoute], *, prefix: str,
+        self,
+        work: str,
+        routes: Mapping[str, ResponsibilityRoute],
+        *,
+        prefix: str,
     ) -> dict[str, float]:
         if not routes:
             return {}
@@ -411,13 +416,19 @@ class JevResponsibilityRouter(ProviderResponsibilityRouter):
     """Backward-compatible Jev routing with identical selection semantics."""
 
     def __init__(
-        self, *, client: Any | None = None, timeout_seconds: float = 10.0,
-        model: str = "jev-latest", budget: JevRequestBudget | None = None,
+        self,
+        *,
+        client: Any | None = None,
+        timeout_seconds: float = 10.0,
+        model: str = "jev-latest",
+        budget: JevRequestBudget | None = None,
         usage_recorder: JevUsageRecorder | None = None,
     ) -> None:
         super().__init__(
             JevDecisionProvider(
-                client=client, timeout_seconds=timeout_seconds, model=model,
+                client=client,
+                timeout_seconds=timeout_seconds,
+                model=model,
                 usage_recorder=usage_recorder,
             ),
             budget=budget,
