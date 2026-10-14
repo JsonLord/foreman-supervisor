@@ -8,8 +8,13 @@ from pathlib import Path
 from typing import Any
 
 DEEPAGENTS_HOOK_EVENTS = (
-    "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
-    "PostToolUseFailure", "Stop", "SessionEnd",
+    "SessionStart",
+    "UserPromptSubmit",
+    "PreToolUse",
+    "PostToolUse",
+    "PostToolUseFailure",
+    "Stop",
+    "SessionEnd",
 )
 
 
@@ -34,14 +39,17 @@ def install_deepagents_hooks(path: Path, executable: str) -> bool:
     for event in DEEPAGENTS_HOOK_EVENTS:
         groups = hooks.setdefault(event, [])
         if not isinstance(groups, list) or any(
-            not isinstance(group, dict) or not isinstance(group.get("hooks"), list)
+            not isinstance(group, dict)
+            or not isinstance(group.get("hooks"), list)
             or any(not isinstance(handler, dict) for handler in group["hooks"])
             for group in groups
         ):
             raise ValueError(f"{event} must contain matcher groups with command handler lists")
         installed = any(
-            group.get("matcher", "*") == "*" and any(
-                handler.get("type") == "command" and (
+            group.get("matcher", "*") == "*"
+            and any(
+                handler.get("type") == "command"
+                and (
                     handler.get("argv") == argv
                     or ("argv" not in handler and handler.get("command") == command)
                 )
@@ -50,9 +58,18 @@ def install_deepagents_hooks(path: Path, executable: str) -> bool:
             for group in groups
         )
         if not installed:
-            groups.append({"hooks": [{
-                "type": "command", "command": command, "argv": argv, "timeout": 120,
-            }]})
+            groups.append(
+                {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": command,
+                            "argv": argv,
+                            "timeout": 120,
+                        }
+                    ]
+                }
+            )
             changed = True
     if not changed:
         return False
@@ -61,7 +78,10 @@ def install_deepagents_hooks(path: Path, executable: str) -> bool:
     temporary: str | None = None
     try:
         with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=path.parent, delete=False,
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            delete=False,
         ) as stream:
             temporary = stream.name
             json.dump(document, stream, indent=2, ensure_ascii=False)

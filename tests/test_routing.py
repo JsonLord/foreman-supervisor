@@ -301,9 +301,7 @@ async def test_hierarchical_routing_activates_every_matching_branch_by_default()
             responsibility_ids=("example.beta",),
         ),
     )
-    router = HierarchicalRouter(
-        {"example.alpha-group": 0.8, "example.beta-group": 0.9}
-    )
+    router = HierarchicalRouter({"example.alpha-group": 0.8, "example.beta-group": 0.9})
 
     decision = await resolve_hierarchical_routing("Both", responsibilities, groups, router)
 

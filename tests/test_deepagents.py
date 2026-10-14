@@ -36,14 +36,25 @@ def test_command_and_configuration(monkeypatch, tmp_path):
     monkeypatch.setenv("FOREMAN_DEEPAGENTS_SHELL_ALLOW_LIST", "git,python,uv")
     config = FactoryConfig.from_environment()
     runtime = FactoryRuntime(
-        repository=tmp_path, job="job", model=FakeForemanModel([]), config=config,
+        repository=tmp_path,
+        job="job",
+        model=FakeForemanModel([]),
+        config=config,
     )
     worker = runtime.worker_factory(WorkerType.CODING)
     assert isinstance(worker, DeepAgentsWorker)
     assert worker.command("--mission with spaces", 3.2) == [
-        "/opt/my tools/dcode", "--max-turns", "42", "--timeout", "4",
-        "--shell-allow-list", "git,python,uv", "--model", "openai:test-model",
-        "--non-interactive", "--mission with spaces",
+        "/opt/my tools/dcode",
+        "--max-turns",
+        "42",
+        "--timeout",
+        "4",
+        "--shell-allow-list",
+        "git,python,uv",
+        "--model",
+        "openai:test-model",
+        "--non-interactive",
+        "--mission with spaces",
     ]
     assert worker.supports_steering is False
 
@@ -51,8 +62,15 @@ def test_command_and_configuration(monkeypatch, tmp_path):
 def test_default_command_does_not_opt_in_project_hooks():
     command = DeepAgentsWorker().command("mission", 10)
     assert command == [
-        "dcode", "--max-turns", "200", "--timeout", "10",
-        "--shell-allow-list", "recommended", "--non-interactive", "mission",
+        "dcode",
+        "--max-turns",
+        "200",
+        "--timeout",
+        "10",
+        "--shell-allow-list",
+        "recommended",
+        "--non-interactive",
+        "mission",
     ]
 
 
@@ -102,19 +120,24 @@ async def test_workspace_and_environment(monkeypatch, tmp_path):
     monkeypatch.setenv("TYPESAFE_API_KEY", "supervisor-secret")
     monkeypatch.setenv("TYPESAFE_BASE_URL", "supervisor-url")
     monkeypatch.setenv("OPENAI_API_KEY", "worker-key")
-    worker = scripted_worker(monkeypatch,
+    worker = scripted_worker(
+        monkeypatch,
         "import os; print(os.getcwd()); "
         "print(any(k.startswith('TYPESAFE_') for k in os.environ)); "
-        "print(os.environ['OPENAI_API_KEY']); print(os.environ['PYTHONUNBUFFERED'])")
+        "print(os.environ['OPENAI_API_KEY']); print(os.environ['PYTHONUNBUFFERED'])",
+    )
     result = await worker.run(record(), tmp_path, discard, 10)
     assert result.stdout.splitlines() == [str(tmp_path), "False", "worker-key", "1"]
 
 
-@pytest.mark.parametrize("code,status,reason", [
-    (0, WorkerStatus.COMPLETED, None),
-    (1, WorkerStatus.FAILED, "nonzero_exit"),
-    (124, WorkerStatus.TIMED_OUT, "deepagents_budget_exhausted"),
-])
+@pytest.mark.parametrize(
+    "code,status,reason",
+    [
+        (0, WorkerStatus.COMPLETED, None),
+        (1, WorkerStatus.FAILED, "nonzero_exit"),
+        (124, WorkerStatus.TIMED_OUT, "deepagents_budget_exhausted"),
+    ],
+)
 @pytest.mark.asyncio
 async def test_exit_status(monkeypatch, tmp_path, code, status, reason):
     worker = scripted_worker(monkeypatch, f"import sys; sys.exit({code})")
@@ -135,8 +158,9 @@ async def test_missing_executable_has_setup_guidance(tmp_path):
 
 @pytest.mark.asyncio
 async def test_timeout_and_reuse_clear_termination(monkeypatch, tmp_path):
-    worker = scripted_worker(monkeypatch, "import time; time.sleep(30)",
-                             graceful_termination_seconds=0.1)
+    worker = scripted_worker(
+        monkeypatch, "import time; time.sleep(30)", graceful_termination_seconds=0.1
+    )
     result = await worker.run(record(), tmp_path, discard, 0.1)
     assert result.status is WorkerStatus.TIMED_OUT
     assert worker.process.returncode is not None
@@ -197,7 +221,12 @@ async def test_termination_escalates_and_kills_descendants(monkeypatch, tmp_path
     # Linux can retain an orphan as a zombie until init reaps it. Verify the
     # child cannot keep working without requiring immediate PID disappearance.
     probe = await asyncio.create_subprocess_exec(
-        "ps", "-p", str(child), "-o", "stat=", stdout=asyncio.subprocess.PIPE,
+        "ps",
+        "-p",
+        str(child),
+        "-o",
+        "stat=",
+        stdout=asyncio.subprocess.PIPE,
     )
     state, _ = await probe.communicate()
     assert not state.strip() or state.strip().startswith(b"Z")

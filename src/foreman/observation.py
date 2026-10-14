@@ -81,9 +81,7 @@ class FactoryObservation(BaseModel):
                 "elapsed_factory_seconds",
             )
         }
-        commands = {
-            item["provider_id"]: item for item in values["command_evidence"]
-        }
+        commands = {item["provider_id"]: item for item in values["command_evidence"]}
         selected_commands: list[dict[str, Any]] = []
         for provider in providers:
             fields = BUILTIN_EVIDENCE_FIELDS.get(provider)
@@ -406,8 +404,7 @@ async def build_observation(
             result.model_dump(mode="json") for result in state.verification_results
         ],
         command_evidence=[
-            result.model_dump(mode="json")
-            for result in latest_command_evidence.values()
+            result.model_dump(mode="json") for result in latest_command_evidence.values()
         ],
         recent_events=recent_events[-config.event_history_limit :],
         previous_result=state.latest_result,

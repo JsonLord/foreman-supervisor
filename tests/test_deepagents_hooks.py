@@ -14,27 +14,44 @@ from foreman.hooks import HookAction, HookError, HookEventKind, HookOutcome
 
 def payload(tmp_path, event="UserPromptSubmit", **kwargs):
     return {
-        "session_id": "dcode-thread", "cwd": str(tmp_path), "hook_event_name": event,
-        "prompt_id": "dcode-prompt", "prompt": "Fix tests", **kwargs,
+        "session_id": "dcode-thread",
+        "cwd": str(tmp_path),
+        "hook_event_name": event,
+        "prompt_id": "dcode-prompt",
+        "prompt": "Fix tests",
+        **kwargs,
     }
 
 
-@pytest.mark.parametrize("name,kind", [
-    ("SessionStart", HookEventKind.SESSION_STARTED),
-    ("UserPromptSubmit", HookEventKind.WORK_SUBMITTED),
-    ("PreToolUse", HookEventKind.BEFORE_TOOL),
-    ("PostToolUse", HookEventKind.AFTER_TOOL),
-    ("PostToolUseFailure", HookEventKind.AFTER_TOOL),
-    ("Stop", HookEventKind.WORKER_STOPPING),
-    ("SessionEnd", HookEventKind.SESSION_ENDED),
-])
+@pytest.mark.parametrize(
+    "name,kind",
+    [
+        ("SessionStart", HookEventKind.SESSION_STARTED),
+        ("UserPromptSubmit", HookEventKind.WORK_SUBMITTED),
+        ("PreToolUse", HookEventKind.BEFORE_TOOL),
+        ("PostToolUse", HookEventKind.AFTER_TOOL),
+        ("PostToolUseFailure", HookEventKind.AFTER_TOOL),
+        ("Stop", HookEventKind.WORKER_STOPPING),
+        ("SessionEnd", HookEventKind.SESSION_ENDED),
+    ],
+)
 def test_native_events(tmp_path, name, kind):
-    event = hook_adapter("deepagents").parse(payload(
-        tmp_path, name, tool_name="Bash", tool_use_id="call-1",
-        tool_input={"command": "pytest"}, tool_response="passed", error="failed",
-        is_interrupt=False, stop_hook_active=True, last_assistant_message="done",
-        transcript_path="/unused.jsonl", agent_id="child-id",
-    ))
+    event = hook_adapter("deepagents").parse(
+        payload(
+            tmp_path,
+            name,
+            tool_name="Bash",
+            tool_use_id="call-1",
+            tool_input={"command": "pytest"},
+            tool_response="passed",
+            error="failed",
+            is_interrupt=False,
+            stop_hook_active=True,
+            last_assistant_message="done",
+            transcript_path="/unused.jsonl",
+            agent_id="child-id",
+        )
+    )
     assert event.client == "deepagents" and event.kind is kind
     assert event.session_id == "dcode-thread"
     assert event.work_id == event.turn_id == "dcode-prompt"
@@ -45,14 +62,17 @@ def test_native_events(tmp_path, name, kind):
         assert event.tool_response == "passed"
 
 
-@pytest.mark.parametrize("extra", [
-    {"hook_event_name": "unknown"},
-    {"prompt": " "},
-    {"hook_event_name": "PreToolUse"},
-    {"hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_use_id": "c"},
-    {"session_id": ""},
-    {"hook_event_name": "SubagentStop"},
-])
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"hook_event_name": "unknown"},
+        {"prompt": " "},
+        {"hook_event_name": "PreToolUse"},
+        {"hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_use_id": "c"},
+        {"session_id": ""},
+        {"hook_event_name": "SubagentStop"},
+    ],
+)
 def test_invalid_input_does_not_create_state(tmp_path, extra):
     with pytest.raises(HookError):
         hook_adapter("deepagents").parse(payload(tmp_path, **extra))
@@ -62,9 +82,15 @@ def test_invalid_input_does_not_create_state(tmp_path, extra):
 @pytest.mark.parametrize("name", DEEPAGENTS_HOOK_EVENTS)
 def test_response_vocabulary(tmp_path, name):
     adapter = hook_adapter("deepagents")
-    event = adapter.parse(payload(
-        tmp_path, name, tool_name="Bash", tool_use_id="c", error="failed",
-    ))
+    event = adapter.parse(
+        payload(
+            tmp_path,
+            name,
+            tool_name="Bash",
+            tool_use_id="c",
+            error="failed",
+        )
+    )
     assert adapter.render(event, HookOutcome()) == {}
     guidance = HookOutcome(action=HookAction.INJECT_CONTEXT, reason="guidance")
     assert adapter.render(event, guidance) == {
@@ -72,14 +98,19 @@ def test_response_vocabulary(tmp_path, name):
     }
     block = adapter.render(event, HookOutcome(action=HookAction.BLOCK, reason="unfinished"))
     if name == "PreToolUse":
-        assert block == {"hookSpecificOutput": {
-            "hookEventName": name, "permissionDecision": "deny",
-            "permissionDecisionReason": "unfinished",
-        }}
+        assert block == {
+            "hookSpecificOutput": {
+                "hookEventName": name,
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "unfinished",
+            }
+        }
     else:
         assert block == {"decision": "block", "reason": "unfinished"}
     assert adapter.render(event, HookOutcome(action=HookAction.HALT, reason="stop")) == {
-        "continue": False, "stopReason": "stop", "systemMessage": "stop",
+        "continue": False,
+        "stopReason": "stop",
+        "systemMessage": "stop",
     }
 
 
@@ -101,9 +132,18 @@ def test_setup_merges_preserves_and_is_idempotent(tmp_path):
     existing = {
         "custom": {"keep": True},
         "hooks": {
-            "PreToolUse": [{"matcher": "Bash", "hooks": [{
-                "type": "command", "command": "existing-policy", "timeout": 20,
-            }]}],
+            "PreToolUse": [
+                {
+                    "matcher": "Bash",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "existing-policy",
+                            "timeout": 20,
+                        }
+                    ],
+                }
+            ],
             "Notification": [{"hooks": [{"type": "command", "command": "notify"}]}],
         },
     }
@@ -124,10 +164,16 @@ def test_setup_merges_preserves_and_is_idempotent(tmp_path):
     assert path.stat().st_mode & 0o777 == 0o640
 
 
-@pytest.mark.parametrize("contents", [
-    "{not-json", "[]", '{"hooks": []}',
-    '{"hooks": {"Stop": "bad"}}', '{"hooks": {"Stop": [{"hooks": ["bad"]}]}}',
-])
+@pytest.mark.parametrize(
+    "contents",
+    [
+        "{not-json",
+        "[]",
+        '{"hooks": []}',
+        '{"hooks": {"Stop": "bad"}}',
+        '{"hooks": {"Stop": [{"hooks": ["bad"]}]}}',
+    ],
+)
 def test_setup_refuses_malformed_config_without_writing(tmp_path, contents):
     path = tmp_path / "hooks.json"
     path.write_text(contents)
@@ -143,9 +189,27 @@ def test_setup_cli_default_and_custom_path(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert (tmp_path / ".deepagents" / "hooks.json").exists()
     custom = tmp_path / "project" / ".deepagents" / "hooks.json"
-    result = runner.invoke(app, ["deepagents", "setup", "--hooks-file", str(custom),
-                                 "--foreman-executable", "/bin/foreman"])
+    result = runner.invoke(
+        app,
+        [
+            "deepagents",
+            "setup",
+            "--hooks-file",
+            str(custom),
+            "--foreman-executable",
+            "/bin/foreman",
+        ],
+    )
     assert result.exit_code == 0 and custom.exists()
-    result = runner.invoke(app, ["deepagents", "setup", "--hooks-file", str(custom),
-                                 "--foreman-executable", "/bin/foreman"])
+    result = runner.invoke(
+        app,
+        [
+            "deepagents",
+            "setup",
+            "--hooks-file",
+            str(custom),
+            "--foreman-executable",
+            "/bin/foreman",
+        ],
+    )
     assert result.exit_code == 0 and "Already installed" in result.output

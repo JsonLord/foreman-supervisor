@@ -137,9 +137,7 @@ evidence = ["git.diff", "command.pytest"]
 """.strip(),
     )
     factory_config = FactoryConfig(
-        command_evidence=(
-            CommandEvidenceConfig(id="pytest", command=("python", "-m", "pytest")),
-        )
+        command_evidence=(CommandEvidenceConfig(id="pytest", command=("python", "-m", "pytest")),)
     )
 
     registry = configured_registry(factory_config, config_dir=tmp_path)

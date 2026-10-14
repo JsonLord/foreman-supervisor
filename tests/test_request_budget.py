@@ -39,14 +39,16 @@ def test_routine_deduplication_reduces_input_without_discarding_evidence() -> No
 
 def test_deduplication_preserves_meaningful_whitespace_differences() -> None:
     text = "    indented code\n" * 40
-    state = {"latest_worker_output": text,
-             "active_workers": [{"stdout_tail": text.strip()}]}
+    state = {"latest_worker_output": text, "active_workers": [{"stdout_tail": text.strip()}]}
     assert JevRequestBudget().fit(state, {"check": "Check"}).state == state
 
 
 def test_soft_target_reduces_requests_already_under_hard_cap() -> None:
-    state = {"original_job": "job", "current_operation": {"tool_name": "read"},
-             "recent_events": [{"index": i, "summary": "output " * 120} for i in range(20)]}
+    state = {
+        "original_job": "job",
+        "current_operation": {"tool_name": "read"},
+        "recent_events": [{"index": i, "summary": "output " * 120} for i in range(20)],
+    }
     fitted = JevRequestBudget().fit(state, {"check": "Check"})
     assert 12_000 < fitted.original_measurements["pair_bytes"] < 30_000
     assert fitted.measurements["pair_bytes"] <= 12_000
@@ -54,9 +56,11 @@ def test_soft_target_reduces_requests_already_under_hard_cap() -> None:
 
 
 def test_soft_target_expands_for_essential_context_and_keeps_useful_evidence() -> None:
-    state = {"original_job": "x" * 13_000,
-             "current_operation": {"tool_input": {"command": "pytest"}},
-             "recent_events": [{"summary": "test output " * 300}]}
+    state = {
+        "original_job": "x" * 13_000,
+        "current_operation": {"tool_input": {"command": "pytest"}},
+        "recent_events": [{"summary": "test output " * 300}],
+    }
     fitted = JevRequestBudget().fit(state, {"check": "Check"})
     assert 12_000 < fitted.measurements["pair_bytes"] <= 30_000
     assert fitted.state == state
@@ -73,7 +77,8 @@ def test_soft_total_target_counts_every_question() -> None:
 
 def test_soft_targets_are_clamped_to_lower_hard_limits() -> None:
     fitted = JevRequestBudget(pair_bytes=4000, total_bytes=8000).fit(
-        {"original_job": "job", "latest_worker_output": "x" * 6000}, {"check": "Check"},
+        {"original_job": "job", "latest_worker_output": "x" * 6000},
+        {"check": "Check"},
     )
     assert fitted.measurements["pair_bytes"] <= 4000
 
@@ -158,17 +163,19 @@ def test_all_questions_count_toward_whole_request_limit() -> None:
 
 
 def test_unicode_and_json_escaping_are_counted_conservatively() -> None:
-    assert json_bytes({"text": "中\n\""}) > len("中\n\"".encode())
+    assert json_bytes({"text": '中\n"'}) > len('中\n"'.encode())
 
 
 @pytest.mark.asyncio
 async def test_assessment_budgets_selected_evidence_and_preserves_questions(caplog) -> None:
     checks = (Check("example", "progress", "Is work progressing?", evidence=("events",)),)
     client = Client(result={"example__progress": 0.9})
-    value = observation().model_copy(update={
-        "recent_events": [{"summary": "large tool result\n" * 1000} for _ in range(30)],
-        "current_operation": {"tool_name": "read", "tool_input": {"path": "file.py"}},
-    })
+    value = observation().model_copy(
+        update={
+            "recent_events": [{"summary": "large tool result\n" * 1000} for _ in range(30)],
+            "current_operation": {"tool_name": "read", "tool_input": {"path": "file.py"}},
+        }
+    )
     with caplog.at_level(logging.INFO):
         result = await JevForemanModel(client=client).assess(value, checks)
 
@@ -211,8 +218,7 @@ async def test_routing_rejects_aggregate_question_overflow_before_network_call()
     client = Client()
     router = JevResponsibilityRouter(client=client)
     routes = {
-        f"group-{i}": ResponsibilityRoute(always=False, instructions="q" * 10_000)
-        for i in range(7)
+        f"group-{i}": ResponsibilityRoute(always=False, instructions="q" * 10_000) for i in range(7)
     }
     with pytest.raises(ResponsibilityRoutingError, match="whole request"):
         await router.route_groups("job", routes)

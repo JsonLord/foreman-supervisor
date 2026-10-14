@@ -53,9 +53,7 @@ def selected_command_evidence(
         for provider in evidence_for(selection)
         if provider.startswith("command.")
     }
-    return tuple(
-        provider for provider in configured if f"command.{provider.id}" in requested
-    )
+    return tuple(provider for provider in configured if f"command.{provider.id}" in requested)
 
 
 def unknown_evidence_providers(

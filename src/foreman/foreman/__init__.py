@@ -4,6 +4,9 @@ from foreman.foreman.provider import ProviderForemanModel
 from foreman.foreman.simulation import FakeForemanModel
 
 __all__ = [
-    "FakeForemanModel", "ForemanModel", "ForemanModelError",
-    "JevForemanModel", "ProviderForemanModel",
+    "FakeForemanModel",
+    "ForemanModel",
+    "ForemanModelError",
+    "JevForemanModel",
+    "ProviderForemanModel",
 ]

@@ -25,22 +25,22 @@ CONTEXT = "Consult the connected project before coding."
 
 
 def definitions():
-    result = {
-        key: ResponsibilityFileConfig(enabled=False) for key in load_responsibility_configs()
-    }
-    result[CUSTOM] = ResponsibilityFileConfig.model_validate({
-        "kind": "declarative",
-        "always": False,
-        "routing_instructions": "Does this prompt require coding or debugging?",
-        "routing_threshold": 0.75,
-        "context": CONTEXT,
-        "checks": {
-            "context_consulted": {
-                "instructions": "Was the connected project consulted for this work?",
-                "min_threshold": 0.75,
-            }
-        },
-    })
+    result = {key: ResponsibilityFileConfig(enabled=False) for key in load_responsibility_configs()}
+    result[CUSTOM] = ResponsibilityFileConfig.model_validate(
+        {
+            "kind": "declarative",
+            "always": False,
+            "routing_instructions": "Does this prompt require coding or debugging?",
+            "routing_threshold": 0.75,
+            "context": CONTEXT,
+            "checks": {
+                "context_consulted": {
+                    "instructions": "Was the connected project consulted for this work?",
+                    "min_threshold": 0.75,
+                }
+            },
+        }
+    )
     return result
 
 
@@ -53,8 +53,14 @@ def central_config(tmp_path, *, repositories=None, custom=True):
         payload.append("[hooks]\nrepositories = " + json.dumps(repositories))
     for key, definition in overrides.items():
         payload.append(f'[hooks.responsibilities."{key}"]')
-        for field in ["enabled", "kind", "always", "routing_instructions",
-                      "routing_threshold", "context"]:
+        for field in [
+            "enabled",
+            "kind",
+            "always",
+            "routing_instructions",
+            "routing_threshold",
+            "context",
+        ]:
             value = getattr(definition, field)
             if value is not None:
                 payload.append(f"{field} = " + json.dumps(value))
@@ -68,14 +74,15 @@ def central_config(tmp_path, *, repositories=None, custom=True):
 
 
 def event(tmp_path, name, **fields):
-    return json.dumps({
-        "session_id": "configured", "cwd": str(tmp_path), "hook_event_name": name, **fields
-    })
+    return json.dumps(
+        {"session_id": "configured", "cwd": str(tmp_path), "hook_event_name": name, **fields}
+    )
 
 
 def invoke(tmp_path, name, **fields):
     result = CliRunner().invoke(
-        app, ["hook", "--data-dir", str(tmp_path / "state")],
+        app,
+        ["hook", "--data-dir", str(tmp_path / "state")],
         input=event(tmp_path, name, **fields),
     )
     assert result.exit_code == 0, result.output
@@ -109,13 +116,18 @@ async def test_focused_project_check_keeps_tool_results_and_excludes_source_evid
     )
     overrides[CUSTOM] = definition.model_copy(update={"checks": {"context_consulted": check}})
     registry = configured_registry(FactoryConfig(), overrides=overrides, require_lifecycle=False)
-    value = observation().model_copy(update={
-        "current_operation": {"tool_input": {"path": "file.py"}},
-        "recent_events": [{"source_event": "PostToolUse", "summary": "MCP read-back succeeded"}],
-        "git_status": " M file.py", "git_diff": "private source " * 4000,
-        "untracked_evidence": "unrelated source",
-        "latest_worker_output": "repeated tool transcript " * 400,
-    })
+    value = observation().model_copy(
+        update={
+            "current_operation": {"tool_input": {"path": "file.py"}},
+            "recent_events": [
+                {"source_event": "PostToolUse", "summary": "MCP read-back succeeded"}
+            ],
+            "git_status": " M file.py",
+            "git_diff": "private source " * 4000,
+            "untracked_evidence": "unrelated source",
+            "latest_worker_output": "repeated tool transcript " * 400,
+        }
+    )
     client = Client(result={CUSTOM + "__context_consulted": 0.9})
     await JevForemanModel(client=client).assess(value, registry.checks())
     state = client.calls[0]["state"]
@@ -207,17 +219,26 @@ def test_unrelated_prompt_clears_previous_work_without_checks(tmp_path, monkeypa
     monkeypatch.setattr("foreman.cli.JevForemanModel", Model)
     invoke(tmp_path, "UserPromptSubmit", prompt="code")
     assert invoke(tmp_path, "UserPromptSubmit", prompt="picnic") == {}
-    for name, fields in [("PreToolUse", {"tool_name": "Read"}),
-                         ("PostToolUse", {"tool_name": "Read"}), ("Stop", {})]:
+    for name, fields in [
+        ("PreToolUse", {"tool_name": "Read"}),
+        ("PostToolUse", {"tool_name": "Read"}),
+        ("Stop", {}),
+    ]:
         assert invoke(tmp_path, name, **fields) == {}
     assert AttachedSessionStore(tmp_path / "state").load("configured").state is None
 
 
-@pytest.mark.parametrize("name,fields", [
-    ("SessionStart", {}), ("UserPromptSubmit", {"prompt": "code"}),
-    ("PreToolUse", {"tool_name": "Read"}), ("PostToolUse", {"tool_name": "Read"}),
-    ("Stop", {}), ("SessionEnd", {}),
-])
+@pytest.mark.parametrize(
+    "name,fields",
+    [
+        ("SessionStart", {}),
+        ("UserPromptSubmit", {"prompt": "code"}),
+        ("PreToolUse", {"tool_name": "Read"}),
+        ("PostToolUse", {"tool_name": "Read"}),
+        ("Stop", {}),
+        ("SessionEnd", {}),
+    ],
+)
 def test_excluded_repository_never_loads_extensions_or_clients(tmp_path, monkeypatch, name, fields):
     monkeypatch.setenv("FOREMAN_CONFIG", str(central_config(tmp_path, repositories=[])))
 
@@ -245,15 +266,24 @@ def test_all_responsibilities_disabled_initializes_no_model(tmp_path, monkeypatc
 
 
 def test_disabling_an_extension_responsibility_removes_its_empty_route_groups():
-    groups = (RouteGroup(
-        id="example.root", route=ResponsibilityRoute(always=True),
-        children=(
-            RouteGroup(id="example.disabled", route=ResponsibilityRoute(always=True),
-                       responsibility_ids=("example.disabled-check",)),
-            RouteGroup(id="example.enabled", route=ResponsibilityRoute(always=True),
-                       responsibility_ids=(CUSTOM,)),
+    groups = (
+        RouteGroup(
+            id="example.root",
+            route=ResponsibilityRoute(always=True),
+            children=(
+                RouteGroup(
+                    id="example.disabled",
+                    route=ResponsibilityRoute(always=True),
+                    responsibility_ids=("example.disabled-check",),
+                ),
+                RouteGroup(
+                    id="example.enabled",
+                    route=ResponsibilityRoute(always=True),
+                    responsibility_ids=(CUSTOM,),
+                ),
+            ),
         ),
-    ),)
+    )
     pruned = prune_disabled_route_groups(groups, {"example.disabled-check"})
     assert [item.id for item in pruned[0].children] == ["example.enabled"]
     assert pruned[0].children[0].responsibility_ids == (CUSTOM,)
@@ -282,8 +312,17 @@ def test_scope_matches_subdirectories_symlinks_and_linked_worktrees(tmp_path):
     repo = tmp_path / "selected" / "project"
     repo.mkdir(parents=True)
     git(repo, "init", "-q")
-    git(repo, "-c", "user.name=Scope test", "-c", "user.email=scope@example.test",
-        "commit", "--allow-empty", "-qm", "initial")
+    git(
+        repo,
+        "-c",
+        "user.name=Scope test",
+        "-c",
+        "user.email=scope@example.test",
+        "commit",
+        "--allow-empty",
+        "-qm",
+        "initial",
+    )
     subdir = repo / "src"
     subdir.mkdir()
     linked = tmp_path / "linked-worktree"

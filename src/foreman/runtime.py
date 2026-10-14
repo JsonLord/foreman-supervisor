@@ -267,10 +267,7 @@ class FactoryRuntime:
                     )
                 )
 
-            if (
-                record.worker_type is WorkerType.CODING
-                and record.status is WorkerStatus.COMPLETED
-            ):
+            if record.worker_type is WorkerType.CODING and record.status is WorkerStatus.COMPLETED:
                 providers = selected_command_evidence(
                     self.responsibilities.checks(), self.config.command_evidence
                 )

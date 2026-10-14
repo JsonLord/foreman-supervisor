@@ -71,6 +71,7 @@ class ForemanFileConfig(BaseModel):
             raise ValueError(f"invalid extension ids: {', '.join(invalid)}")
         return value
 
+
 class ExtensionManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -448,13 +449,10 @@ class ExtensionManager:
                 raise
             except Exception as error:
                 raise ExtensionError(
-                    f"extension {extension_id!r} activation failed: "
-                    f"{type(error).__name__}: {error}"
+                    f"extension {extension_id!r} activation failed: {type(error).__name__}: {error}"
                 ) from error
             if not isinstance(contribution, ExtensionContribution):
-                raise ExtensionError(
-                    f"extension {extension_id!r} returned an invalid contribution"
-                )
+                raise ExtensionError(f"extension {extension_id!r} returned an invalid contribution")
             if snapshot is not None:
                 revisions[extension_id] = snapshot.revision
             extension_responsibility_ids: set[str] = set()
@@ -471,6 +469,7 @@ class ExtensionManager:
                 extension_responsibility_ids.add(responsibility_id)
                 registrations.append(registration)
             if contribution.routing_root is not None:
+
                 def validate_group(
                     group: RouteGroup,
                     *,
@@ -573,13 +572,10 @@ class ExtensionManager:
             raise
         except Exception as error:
             raise ExtensionError(
-                f"extension {extension_id!r} login failed: "
-                f"{type(error).__name__}: {error}"
+                f"extension {extension_id!r} login failed: {type(error).__name__}: {error}"
             ) from error
         snapshot = (
-            await self.sync(extension_id)
-            if callable(getattr(extension, "sync", None))
-            else None
+            await self.sync(extension_id) if callable(getattr(extension, "sync", None)) else None
         )
         return identity, snapshot
 
@@ -600,8 +596,7 @@ class ExtensionManager:
             raise
         except Exception as error:
             raise ExtensionError(
-                f"extension {extension_id!r} logout failed: "
-                f"{type(error).__name__}: {error}"
+                f"extension {extension_id!r} logout failed: {type(error).__name__}: {error}"
             ) from error
         self.snapshots.delete(extension_id)
 

@@ -18,9 +18,7 @@ def _status(*names: str) -> str:
 def test_untracked_evidence_includes_text_file_content(tmp_path) -> None:
     (tmp_path / "new_test.py").write_text("def test_new():\n    assert True\n", encoding="utf-8")
 
-    evidence = _untracked_evidence(
-        tmp_path, _status("new_test.py"), file_limit=3, byte_limit=4096
-    )
+    evidence = _untracked_evidence(tmp_path, _status("new_test.py"), file_limit=3, byte_limit=4096)
 
     assert "--- untracked: new_test.py ---" in evidence
     assert "def test_new():" in evidence
@@ -58,9 +56,7 @@ def test_untracked_evidence_respects_byte_limit(tmp_path) -> None:
 def test_untracked_evidence_truncates_large_files(tmp_path) -> None:
     (tmp_path / "big.py").write_text("z" * 5_000, encoding="utf-8")
 
-    evidence = _untracked_evidence(
-        tmp_path, _status("big.py"), file_limit=3, byte_limit=1_000
-    )
+    evidence = _untracked_evidence(tmp_path, _status("big.py"), file_limit=3, byte_limit=1_000)
 
     assert "truncated, 5000 bytes total" in evidence
     assert "z" * 5_000 not in evidence
@@ -132,19 +128,14 @@ def test_untracked_evidence_does_not_follow_symlinks(tmp_path) -> None:
     real.write_text("real content\n", encoding="utf-8")
     (tmp_path / "link.txt").symlink_to(real)
 
-    evidence = _untracked_evidence(
-        tmp_path, _status("link.txt"), file_limit=3, byte_limit=4096
-    )
+    evidence = _untracked_evidence(tmp_path, _status("link.txt"), file_limit=3, byte_limit=4096)
 
     assert evidence == ""
 
 
 def test_untracked_evidence_empty_without_untracked_files(tmp_path) -> None:
     assert _untracked_evidence(tmp_path, "", file_limit=3, byte_limit=4096) == ""
-    assert (
-        _untracked_evidence(tmp_path, " M tracked.py\n", file_limit=3, byte_limit=4096)
-        == ""
-    )
+    assert _untracked_evidence(tmp_path, " M tracked.py\n", file_limit=3, byte_limit=4096) == ""
 
 
 @pytest.mark.asyncio

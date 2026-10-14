@@ -12,8 +12,12 @@ def _repository_identity(path: Path) -> Path:
     try:
         result = subprocess.run(
             [
-                "git", "-C", str(directory), "rev-parse",
-                "--path-format=absolute", "--git-common-dir",
+                "git",
+                "-C",
+                str(directory),
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-common-dir",
             ],
             capture_output=True,
             text=True,

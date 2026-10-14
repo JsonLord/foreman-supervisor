@@ -16,13 +16,18 @@ class ProviderForemanModel:
     """Translate existing checks and bounded observations to semantic requests."""
 
     def __init__(
-        self, provider: DecisionProvider, *, budget: AssessmentRequestBudget | None = None,
+        self,
+        provider: DecisionProvider,
+        *,
+        budget: AssessmentRequestBudget | None = None,
     ) -> None:
         self.provider = provider
         self.budget = budget or AssessmentRequestBudget()
 
     async def assess(
-        self, observation: FactoryObservation, checks: Sequence[Check],
+        self,
+        observation: FactoryObservation,
+        checks: Sequence[Check],
     ) -> ForemanResult:
         groups: dict[tuple[str, ...], list[Check]] = {}
         for check in checks:
@@ -38,9 +43,7 @@ class ProviderForemanModel:
 
         async def assess_group(request: AssessmentRequest, group: Sequence[Check]):
             result = await self.provider.assess(request)
-            return {
-                check.key: result.probabilities[check.key] for check in group
-            }
+            return {check.key: result.probabilities[check.key] for check in group}
 
         results = await asyncio.gather(*(assess_group(request, group) for request, group in plans))
         merged = {}

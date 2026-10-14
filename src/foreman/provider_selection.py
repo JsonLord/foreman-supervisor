@@ -30,8 +30,11 @@ def validate_provider_configuration(config: FactoryConfig) -> None:
 
 
 def semantic_components(
-    config: FactoryConfig, *, budget: AssessmentRequestBudget,
-    usage_recorder: JevUsageRecorder, laya_transport: LayaTransport | None = None,
+    config: FactoryConfig,
+    *,
+    budget: AssessmentRequestBudget,
+    usage_recorder: JevUsageRecorder,
+    laya_transport: LayaTransport | None = None,
     jev_model_factory: Callable[..., ForemanModel] = JevForemanModel,
     jev_router_factory: Callable[..., ResponsibilityRouter] = JevResponsibilityRouter,
 ) -> tuple[ForemanModel, ResponsibilityRouter]:
@@ -39,11 +42,13 @@ def semantic_components(
         return (
             jev_model_factory(
                 timeout_seconds=config.jev_timeout_seconds,
-                budget=budget, usage_recorder=usage_recorder,
+                budget=budget,
+                usage_recorder=usage_recorder,
             ),
             jev_router_factory(
                 timeout_seconds=config.jev_timeout_seconds,
-                budget=budget, usage_recorder=usage_recorder,
+                budget=budget,
+                usage_recorder=usage_recorder,
             ),
         )
     if not config.laya_base_url:
@@ -51,12 +56,18 @@ def semantic_components(
     key = os.getenv("FOREMAN_LAYA_API_KEY")
     try:
         settings = LayaSettings(
-            base_url=config.laya_base_url, api_key=SecretStr(key) if key else None,
+            base_url=config.laya_base_url,
+            api_key=SecretStr(key) if key else None,
             timeout_seconds=config.laya_timeout_seconds,
         )
     except ValueError:
         raise ForemanModelError("Laya: invalid base URL or timeout configuration") from None
+    if laya_transport is None:
+        from foreman.laya_transport import HttpLayaTransport
+
+        laya_transport = HttpLayaTransport(max_response_bytes=60_000)
     provider = LayaDecisionProvider(settings=settings, transport=laya_transport, budget=budget)
     return ProviderForemanModel(provider, budget=budget), ProviderResponsibilityRouter(
-        provider, budget=budget,
+        provider,
+        budget=budget,
     )
