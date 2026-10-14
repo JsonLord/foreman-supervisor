@@ -70,3 +70,12 @@ claim.
 The action depends on non-semantic invariants: whether a verifier already ran, how many workers are
 allowed, whether retries remain, and whether finish thresholds are jointly satisfied. Those belong
 in deterministic policy. Jev provides the uncertain state estimate; Python provides control.
+
+## Provider-neutral System 1 supervision
+
+The same architecture can use Laya for semantic judgments. Frequent supervision benefits
+from short, typed, independent probability estimates rather than generated worker actions.
+Jev remains supported and selected by default; Laya is an explicit alternative with a
+shared provider contract for assessment and routing. `FactoryPolicy` always decides what
+an estimate permits. See [Laya](laya.md) for the OpenJev binary-decision reference and
+why the deployed service's contract must be verified before enabling its HTTP transport.

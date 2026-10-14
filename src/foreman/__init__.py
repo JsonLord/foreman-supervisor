@@ -8,6 +8,7 @@ from foreman.models import (
     ForemanResult,
     InterventionType,
 )
+from foreman.providers import AssessmentRequest, AssessmentResult, DecisionProvider
 from foreman.responsibilities import (
     Check,
     Responsibility,
@@ -21,6 +22,9 @@ from foreman.version import __version__
 
 __all__ = [
     "__version__",
+    "AssessmentRequest",
+    "AssessmentResult",
+    "DecisionProvider",
     "FactoryAssessment",
     "FactoryConfig",
     "FactoryRuntime",

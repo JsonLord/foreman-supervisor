@@ -6,7 +6,7 @@
 Codex App Server ─events─► FactoryRuntime ─snapshot─► ObservationBuilder
        ▲                         │                           │
        │                         │                           ▼
-       │                  ResponsibilityRegistry ─checks─► JevForemanModel
+       │                  ResponsibilityRegistry ─checks─► ProviderForemanModel
        │                         │                           │
        └── steer / interrupt ◄── FactoryPolicy ◄─ForemanResult
                                  │
@@ -20,7 +20,10 @@ Codex App Server ─events─► FactoryRuntime ─snapshot─► ObservationBui
 - `ObservationBuilder` gathers bounded worker, event, and Git evidence concurrently.
 - `ResponsibilityRegistry` owns the active logical responsibilities and flattens their checks for
   one model call.
-- `JevForemanModel` is the only module that imports the TypeSafe SDK.
+- `DecisionProvider` is the shared bounded semantic boundary for assessment and routing.
+  `JevDecisionProvider` owns TypeSafe SDK calls; `JevForemanModel` and
+  `JevResponsibilityRouter` retain their existing public entry points.
+- `LayaDecisionProvider` validates an injectable transport; live HTTP awaits contract verification.
 - Each responsibility proposes zero or more directives from its check results.
 - `FactoryPolicy` applies runtime guardrails and deterministically selects one directive.
 - `RunStore` atomically replaces state and appends immutable events.
@@ -35,7 +38,7 @@ offline tests; real runs default to Jev and Codex.
 3. After a coding worker completes, command evidence providers referenced by active checks run and
    persist their bounded results before the completion event forces an immediate cycle.
 4. Git status/diff and current state become one bounded `FactoryObservation`.
-5. The registry supplies all active responsibilities' checks to one Jev request.
+5. The registry supplies all active responsibilities' checks to provider requests, grouped by their exact evidence selections.
 6. Pydantic validates and groups the check outputs into one `ForemanResult`.
 7. Responsibilities propose directives; policy records all proposals and selects one permitted
    directive in the same result.
@@ -48,7 +51,7 @@ itself recursively.
 Before the first worker starts, real CLI runs load Foreman's central per-responsibility
 configuration and route the incoming job. This configuration is independent of the target
 repository. Global responsibilities are included directly; all conditional responsibilities are
-evaluated together in one Jev call, and every threshold match is activated. The routing decision
+evaluated together in one provider call, and every threshold match is activated. The routing decision
 is persisted as `FOREMAN_ROUTED`. See
 [Responsibility configuration and routing](routing.md).
 
@@ -56,7 +59,7 @@ Interactive workers started outside Foreman use an assistant-specific protocol a
 shared, single-event runtime. `foreman hook --client <adapter>` normalizes incoming events, keys
 bounded global state by client and native session ID, routes each submitted prompt from the
 built-in definitions and configured local extension snapshots, and applies the same observation,
-Jev model, responsibility, and policy components.
+semantic provider, responsibility, and policy components.
 It never creates repository-local run state. See
 [coding-assistant hooks and attached workers](hooks.md).
 
@@ -67,9 +70,9 @@ responsibility set from changing silently during a session. See [Extensions](ext
 
 Both runtimes also load command evidence providers from the same central config. Managed runs
 execute referenced providers between coding-worker completion and `WORKER_COMPLETED`; attached
-sessions execute them on `Stop` before building the observation. Each Jev check receives either its
+sessions execute them on `Stop` before building the observation. Each semantic check receives either its
 explicit `evidence` list or the built-in default provider list. Checks with identical selections
-remain batched into one Jev call; different selections use separately filtered calls. Exit status
+remain batched into one provider call; different selections use separately filtered calls. Exit status
 and output are evidence interpreted by the check, not hard-coded policy. See
 [Evidence providers](evidence.md).
 
@@ -123,3 +126,22 @@ Start with these modules:
 5. `src/foreman/foreman/jev.py` — SDK isolation and batched check evaluation.
 6. `src/foreman/workers/codex_app_server.py` — steerable App Server integration.
 7. `src/foreman/workers/codex.py` — non-steerable `codex exec` fallback.
+
+## Provider selection and failure boundary
+
+Both managed runs and attached hooks construct assessment and routing components from
+`FactoryConfig.decision_provider`. The default is `jev`; `laya` selects the Laya
+implementation for both boundaries. Provider results remain independent probabilities
+for the active question keys, never worker directives. The registry's global routes,
+conditional thresholds, simultaneous matches and hierarchy remain authoritative.
+
+`AssessmentRequestBudget` is an alias for the existing `JevRequestBudget`: byte ceilings,
+protected observation fields, compaction and legacy environment variables are unchanged.
+The provider only receives the observation fragment selected by the checks. Laya rejects
+missing, extra, duplicate, nonfinite and out-of-range probabilities. Failed assessments
+raise `ForemanModelError`; existing consecutive-failure accounting and escalation apply.
+Malformed routing fails before worker launch. There are no synthesized risk scores.
+
+Worker environments remove `TYPESAFE_*` and supervisor-specific `FOREMAN_LAYA_*`, preserving unrelated
+worker provider credentials. OpenCode command construction and model/provider selection
+are unchanged. See [Laya configuration and contract status](laya.md).

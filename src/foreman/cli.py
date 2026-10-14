@@ -24,7 +24,7 @@ from foreman.extensions import (
     ExtensionSnapshot,
     load_foreman_file_config,
 )
-from foreman.foreman import FakeForemanModel, JevForemanModel
+from foreman.foreman import FakeForemanModel, ForemanModelError, JevForemanModel
 from foreman.hook_adapters import hook_adapter
 from foreman.hooks import (
     AttachedSessionStore,
@@ -37,6 +37,7 @@ from foreman.jev_usage import JevUsageRecorder
 from foreman.models import EventType, FactoryStatus, WorkerType
 from foreman.paths import foreman_config_path, foreman_data_dir
 from foreman.persistence import PersistenceError, RunStore
+from foreman.provider_selection import semantic_components, validate_provider_configuration
 from foreman.repository_scope import repository_in_scope
 from foreman.request_budget import JevRequestBudget
 from foreman.responsibilities import (
@@ -304,17 +305,13 @@ def hook(
             target_total_bytes=config.jev_request_target_bytes,
         )
         usage_recorder = JevUsageRecorder(central_data_dir / "jev-usage.jsonl")
+        model, router = semantic_components(
+            config, budget=budget, usage_recorder=usage_recorder,
+            jev_model_factory=JevForemanModel, jev_router_factory=JevResponsibilityRouter,
+        )
         runtime = AttachedWorkerRuntime(
-            model=JevForemanModel(
-                timeout_seconds=config.jev_timeout_seconds,
-                budget=budget,
-                usage_recorder=usage_recorder,
-            ),
-            router=JevResponsibilityRouter(
-                timeout_seconds=config.jev_timeout_seconds,
-                budget=budget,
-                usage_recorder=usage_recorder,
-            ),
+            model=model,
+            router=router,
             responsibilities=responsibilities,
             config=config,
             store=AttachedSessionStore(
@@ -345,6 +342,7 @@ def hook(
         HookError,
         ResponsibilityConfigError,
         ResponsibilityRoutingError,
+        ForemanModelError,
     ) as error:
         if extensions is not None and not runtime_started:
             asyncio.run(extensions.close())
@@ -385,7 +383,7 @@ def run(
         ),
     ] = None,
 ) -> None:
-    """Launch a coding worker supervised by TypeSafe AI Jev."""
+    """Launch a coding worker supervised by the selected semantic provider."""
 
     # Capture the process-level factory setting before reading the target repository's
     # local environment. A managed repository cannot select Foreman's responsibilities.
@@ -399,12 +397,12 @@ def run(
 
     load_dotenv(repo / ".env", override=False)
     load_dotenv(override=False)
-    if not os.getenv("TYPESAFE_API_KEY"):
-        console.print(
-            "Missing TYPESAFE_API_KEY. Copy .env.example to .env and add your TypeSafe API key."
-        )
-        raise typer.Exit(code=2)
-    config = FactoryConfig.from_environment()
+    try:
+        config = FactoryConfig.from_environment()
+        validate_provider_configuration(config)
+    except (ValueError, ForemanModelError) as error:
+        console.print(str(error))
+        raise typer.Exit(code=2) from error
     extensions: ExtensionManager | None = None
     try:
         extensions = ExtensionManager(
@@ -430,27 +428,23 @@ def run(
             target_total_bytes=config.jev_request_target_bytes,
         )
         usage_recorder = JevUsageRecorder(extensions.data_dir / "jev-usage.jsonl")
+        model, router = semantic_components(
+            config, budget=budget, usage_recorder=usage_recorder,
+            jev_model_factory=JevForemanModel, jev_router_factory=JevResponsibilityRouter,
+        )
         runtime = FactoryRuntime(
             repository=repo,
             job=job,
-            model=JevForemanModel(
-                timeout_seconds=config.jev_timeout_seconds,
-                budget=budget,
-                usage_recorder=usage_recorder,
-            ),
+            model=model,
             config=config,
             event_sink=TerminalRenderer(console),
             responsibilities=responsibilities,
-            router=JevResponsibilityRouter(
-                timeout_seconds=config.jev_timeout_seconds,
-                budget=budget,
-                usage_recorder=usage_recorder,
-            ),
+            router=router,
             routing_groups=activated.routing_groups,
             active_extension_ids=activated.extension_ids,
             extension_snapshot_revisions=dict(activated.snapshot_revisions),
         )
-    except (ExtensionError, ResponsibilityConfigError) as error:
+    except (ExtensionError, ResponsibilityConfigError, ForemanModelError) as error:
         if extensions is not None:
             asyncio.run(extensions.close())
         console.print(str(error))

@@ -52,6 +52,9 @@ class FactoryConfig(BaseModel):
 
     assessment_min_interval_seconds: float = Field(default=5.0, ge=0.0)
     periodic_assessment_seconds: float = Field(default=30.0, gt=0.0)
+    decision_provider: Literal["jev", "laya"] = "jev"
+    laya_base_url: str | None = None
+    laya_timeout_seconds: float = Field(default=10.0, gt=0.0, allow_inf_nan=False)
     jev_timeout_seconds: float = Field(default=10.0, gt=0.0)
     jev_pair_budget_bytes: int = Field(default=30_000, ge=512, le=30_000)
     jev_request_budget_bytes: int = Field(default=60_000, ge=512, le=60_000)
@@ -105,6 +108,9 @@ class FactoryConfig(BaseModel):
                 float,
             ),
             "FOREMAN_PERIODIC_ASSESSMENT_SECONDS": ("periodic_assessment_seconds", float),
+            "FOREMAN_DECISION_PROVIDER": ("decision_provider", str),
+            "FOREMAN_LAYA_BASE_URL": ("laya_base_url", str),
+            "FOREMAN_LAYA_TIMEOUT": ("laya_timeout_seconds", float),
             "FOREMAN_JEV_TIMEOUT_SECONDS": ("jev_timeout_seconds", float),
             "FOREMAN_JEV_PAIR_BUDGET_BYTES": ("jev_pair_budget_bytes", int),
             "FOREMAN_JEV_REQUEST_BUDGET_BYTES": ("jev_request_budget_bytes", int),

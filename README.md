@@ -265,6 +265,20 @@ Default policy thresholds are:
 These values are declared as `min_threshold` beside their checks in the responsibility TOMLs; the
 table is only a consolidated view.
 
+## Semantic providers
+
+Foreman supports a provider-neutral assessment and responsibility-routing boundary.
+Jev remains the default through the official TypeSafe SDK; existing `TYPESAFE_API_KEY`
+configurations continue to work. Laya is opt-in with `FOREMAN_DECISION_PROVIDER=laya`.
+Both providers supply semantic probabilities. Responsibilities and `FactoryPolicy`
+retain authority over worker actions, thresholds, retry limits and verification.
+
+Laya currently supports an injectable, offline-tested transport. Production HTTP is
+`BLOCKED_PENDING_LAYA_CONTRACT`: the deployed service's schema, independent-question
+batching and authentication still need verification. Selecting Laya through the CLI
+fails before starting a worker until that transport is available. See [Laya](docs/laya.md)
+for configuration, the OpenJev reference, and the remaining validation requirements.
+
 ## Why Jev?
 
 The integration follows TypeSafe's current official Python SDK:

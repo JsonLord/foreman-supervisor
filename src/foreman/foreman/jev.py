@@ -1,20 +1,16 @@
 from __future__ import annotations
 
-import asyncio
-import logging
 from collections.abc import Mapping, Sequence
 from math import isfinite
 from typing import Any
 
-from foreman.evidence import evidence_for
 from foreman.foreman.base import ForemanModelError
+from foreman.foreman.provider import ProviderForemanModel
 from foreman.jev_usage import JevUsageRecorder
 from foreman.models import ForemanResult
-from foreman.observation import FactoryObservation
-from foreman.request_budget import BudgetedRequest, JevRequestBudget, RequestBudgetError
+from foreman.providers import JevDecisionProvider
+from foreman.request_budget import JevRequestBudget
 from foreman.responsibilities import Check
-
-logger = logging.getLogger(__name__)
 
 
 def normalize_check_results(
@@ -62,122 +58,21 @@ def parse_jev_response(response: Any, checks: Sequence[Check]) -> ForemanResult:
     return normalize_check_results(values, checks)
 
 
-class JevForemanModel:
-    """Adapter for TypeSafe's official asynchronous Python SDK."""
+class JevForemanModel(ProviderForemanModel):
+    """Backward-compatible Jev model using the generic semantic boundary."""
 
     def __init__(
-        self,
-        *,
-        client: Any | None = None,
-        timeout_seconds: float = 10.0,
-        model: str = "jev-latest",
-        budget: JevRequestBudget | None = None,
+        self, *, client: Any | None = None, timeout_seconds: float = 10.0,
+        model: str = "jev-latest", budget: JevRequestBudget | None = None,
         usage_recorder: JevUsageRecorder | None = None,
     ) -> None:
-        self._client = client
+        super().__init__(
+            JevDecisionProvider(
+                client=client, timeout_seconds=timeout_seconds, model=model,
+                usage_recorder=usage_recorder,
+            ),
+            budget=budget,
+        )
         self.timeout_seconds = timeout_seconds
         self.model = model
-        self.budget = budget or JevRequestBudget()
-        self.usage_recorder = usage_recorder or JevUsageRecorder()
-        self._owns_client = client is None
-
-    def _make_client(self) -> Any:
-        try:
-            from typesafe_sdk import AsyncTypeSafeClient, RetryPolicy
-        except ImportError as error:
-            raise ForemanModelError(
-                "typesafe-sdk is not installed; install the project dependencies"
-            ) from error
-        return AsyncTypeSafeClient(
-            model=self.model,
-            timeout=self.timeout_seconds,
-            retry=RetryPolicy(
-                max_retries=2,
-                http_statuses={429, 500, 502, 503, 504},
-                respect_retry_after=True,
-                timeout=self.timeout_seconds,
-            ),
-        )
-
-    async def assess(
-        self,
-        observation: FactoryObservation,
-        checks: Sequence[Check],
-    ) -> ForemanResult:
-        try:
-            from typesafe_sdk import Noul
-        except ImportError as error:
-            if self._client is None:
-                raise ForemanModelError("typesafe-sdk is not installed") from error
-
-            class Noul:  # type: ignore[no-redef]
-                def __init__(self, *, instructions: str) -> None:
-                    self.instructions = instructions
-
-        client = self._client or self._make_client()
-        if self._client is None:
-            self._client = client
-
-        groups: dict[tuple[str, ...], list[Check]] = {}
-        for check in checks:
-            groups.setdefault(evidence_for(check), []).append(check)
-
-        plans = []
-        try:
-            for providers, group in groups.items():
-                fitted = self.budget.fit(
-                    observation.state_for(providers),
-                    {check.key: check.instructions for check in group},
-                )
-                if "evidence_budget" in fitted.state:
-                    logger.info(
-                        "Compacted Jev evidence: %s", fitted.measurements,
-                    )
-                plans.append((fitted, group))
-        except RequestBudgetError as error:
-            raise ForemanModelError(str(error)) from error
-
-        async def assess_group(request: BudgetedRequest, group: Sequence[Check]) -> ForemanResult:
-            questions = {
-                check.key: Noul(instructions=check.instructions) for check in group
-            }
-            response = await asyncio.wait_for(
-                client.system_one(
-                    state=request.state,
-                    questions=questions,
-                    model=self.model,
-                    timeout=self.timeout_seconds,
-                ),
-                timeout=self.timeout_seconds + 0.5,
-            )
-            self.usage_recorder.record(
-                response, request, purpose="assessment", model=self.model,
-            )
-            return parse_jev_response(response, group)
-
-        try:
-            results = await asyncio.gather(
-                *(
-                    assess_group(request, group)
-                    for request, group in plans
-                )
-            )
-            merged: dict[str, dict[str, float]] = {}
-            for result in results:
-                for responsibility_id, values in result.checks.items():
-                    merged.setdefault(responsibility_id, {}).update(values)
-            return ForemanResult(checks=merged)
-        except TimeoutError as error:
-            raise ForemanModelError("Jev assessment timed out") from error
-        except ForemanModelError:
-            raise
-        except Exception as error:
-            message = f"Jev assessment failed: {type(error).__name__}: {error}"
-            raise ForemanModelError(message) from error
-
-    async def close(self) -> None:
-        if self._owns_client and self._client is not None:
-            close = getattr(self._client, "aclose", None)
-            if close is not None:
-                await close()
-        self._client = None
+        self.usage_recorder = self.provider.usage_recorder

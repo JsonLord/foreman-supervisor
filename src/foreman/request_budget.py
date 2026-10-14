@@ -187,3 +187,7 @@ class JevRequestBudget:
             f"whole request={sizes['total_bytes']}/{self.total_bytes}). "
             "Reduce the submitted work, tool arguments, instructions, or question definitions."
         )
+
+
+# Retain the exact conservative Jev accounting and legacy public API.
+AssessmentRequestBudget = JevRequestBudget

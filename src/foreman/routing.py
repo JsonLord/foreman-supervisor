@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import StrEnum
-from math import isfinite
 from typing import Annotated, Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
+from foreman.foreman.base import ForemanModelError
 from foreman.jev_usage import JevUsageRecorder
+from foreman.providers import AssessmentRequest, DecisionProvider, JevDecisionProvider
 from foreman.request_budget import JevRequestBudget, RequestBudgetError
 from foreman.responsibilities import ResponsibilityRegistry, ResponsibilityRoute
 
@@ -324,87 +324,14 @@ def _routing_key(candidate_id: str, *, prefix: str = "responsibility") -> str:
     return f"{prefix}__{candidate_id}"
 
 
-def _parse_scores(
-    response: Any,
-    candidate_ids: list[str],
-    *,
-    prefix: str = "responsibility",
-) -> dict[str, float]:
-    values: dict[str, Any] = {}
-    nouls = getattr(response, "nouls", None)
-    if nouls is not None:
-        for candidate_id in candidate_ids:
-            answer = nouls.get(_routing_key(candidate_id, prefix=prefix))
-            if answer is not None:
-                values[candidate_id] = getattr(answer, "noul", None)
-    elif isinstance(response, Mapping):
-        answers = response.get("answers", response)
-        if isinstance(answers, Mapping):
-            for candidate_id in candidate_ids:
-                answer = answers.get(_routing_key(candidate_id, prefix=prefix))
-                if isinstance(answer, Mapping):
-                    values[candidate_id] = answer.get("noul")
-                elif answer is not None:
-                    values[candidate_id] = answer
-
-    missing = set(candidate_ids) - set(values)
-    if missing:
-        raise ResponsibilityRoutingError(
-            f"Jev routing response omitted: {', '.join(sorted(missing))}"
-        )
-
-    scores: dict[str, float] = {}
-    for candidate_id in candidate_ids:
-        raw = values[candidate_id]
-        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
-            raise ResponsibilityRoutingError(
-                f"Jev routing answer for {candidate_id!r} is not numeric"
-            )
-        score = float(raw)
-        if not isfinite(score):
-            raise ResponsibilityRoutingError(
-                f"Jev routing answer for {candidate_id!r} is not finite"
-            )
-        scores[candidate_id] = min(1.0, max(0.0, score))
-    return scores
-
-
-class JevResponsibilityRouter:
-    """Use one Jev call to activate zero or more non-global responsibilities."""
+class ProviderResponsibilityRouter:
+    """Use batched semantic scores with the existing deterministic route selection."""
 
     def __init__(
-        self,
-        *,
-        client: Any | None = None,
-        timeout_seconds: float = 10.0,
-        model: str = "jev-latest",
-        budget: JevRequestBudget | None = None,
-        usage_recorder: JevUsageRecorder | None = None,
+        self, provider: DecisionProvider, *, budget: JevRequestBudget | None = None,
     ) -> None:
-        self._client = client
-        self.timeout_seconds = timeout_seconds
-        self.model = model
+        self.provider = provider
         self.budget = budget or JevRequestBudget()
-        self.usage_recorder = usage_recorder or JevUsageRecorder()
-        self._owns_client = client is None
-
-    def _make_client(self) -> Any:
-        try:
-            from typesafe_sdk import AsyncTypeSafeClient, RetryPolicy
-        except ImportError as error:
-            raise ResponsibilityRoutingError(
-                "typesafe-sdk is not installed; install the project dependencies"
-            ) from error
-        return AsyncTypeSafeClient(
-            model=self.model,
-            timeout=self.timeout_seconds,
-            retry=RetryPolicy(
-                max_retries=2,
-                http_statuses={429, 500, 502, 503, 504},
-                respect_retry_after=True,
-                timeout=self.timeout_seconds,
-            ),
-        )
 
     async def route(
         self,
@@ -458,71 +385,43 @@ class JevResponsibilityRouter:
         )
 
     async def _score(
-        self,
-        work: str,
-        routes: Mapping[str, ResponsibilityRoute],
-        *,
-        prefix: str,
+        self, work: str, routes: Mapping[str, ResponsibilityRoute], *, prefix: str,
     ) -> dict[str, float]:
         if not routes:
             return {}
-        try:
-            from typesafe_sdk import Noul
-        except ImportError as error:
-            if self._client is None:
-                raise ResponsibilityRoutingError("typesafe-sdk is not installed") from error
-
-            class Noul:  # type: ignore[no-redef]
-                def __init__(self, *, instructions: str) -> None:
-                    self.instructions = instructions
-
         questions = {
-            _routing_key(candidate_id, prefix=prefix): Noul(
-                instructions=route.instructions or ""
-            )
+            _routing_key(candidate_id, prefix=prefix): route.instructions or ""
             for candidate_id, route in routes.items()
         }
-        client = self._client or self._make_client()
-        if self._client is None:
-            self._client = client
         try:
-            fitted = self.budget.fit(
-                {"work": work},
-                {
-                    _routing_key(candidate_id, prefix=prefix): route.instructions or ""
-                    for candidate_id, route in routes.items()
-                },
-                compact=False,
-            )
-            response = await asyncio.wait_for(
-                client.system_one(
-                    state=fitted.state,
-                    questions=questions,
-                    model=self.model,
-                    timeout=self.timeout_seconds,
-                ),
-                timeout=self.timeout_seconds + 0.5,
-            )
-            self.usage_recorder.record(
-                response, fitted, purpose="routing", model=self.model,
-            )
-            scores = _parse_scores(response, list(routes), prefix=prefix)
-        except TimeoutError as error:
-            raise ResponsibilityRoutingError("Jev responsibility routing timed out") from error
-        except ResponsibilityRoutingError:
-            raise
-        except RequestBudgetError as error:
+            fitted = self.budget.fit({"work": work}, questions, compact=False)
+            result = await self.provider.assess(AssessmentRequest(fitted, questions, "routing"))
+            return {
+                candidate_id: result.probabilities[_routing_key(candidate_id, prefix=prefix)]
+                for candidate_id in routes
+            }
+        except (ForemanModelError, RequestBudgetError) as error:
             raise ResponsibilityRoutingError(str(error)) from error
-        except Exception as error:
-            raise ResponsibilityRoutingError(
-                f"Jev responsibility routing failed: {type(error).__name__}: {error}"
-            ) from error
-
-        return scores
 
     async def close(self) -> None:
-        if self._owns_client and self._client is not None:
-            close = getattr(self._client, "aclose", None)
-            if close is not None:
-                await close()
-        self._client = None
+        await self.provider.close()
+
+
+class JevResponsibilityRouter(ProviderResponsibilityRouter):
+    """Backward-compatible Jev routing with identical selection semantics."""
+
+    def __init__(
+        self, *, client: Any | None = None, timeout_seconds: float = 10.0,
+        model: str = "jev-latest", budget: JevRequestBudget | None = None,
+        usage_recorder: JevUsageRecorder | None = None,
+    ) -> None:
+        super().__init__(
+            JevDecisionProvider(
+                client=client, timeout_seconds=timeout_seconds, model=model,
+                usage_recorder=usage_recorder,
+            ),
+            budget=budget,
+        )
+        self.timeout_seconds = timeout_seconds
+        self.model = model
+        self.usage_recorder = self.provider.usage_recorder
