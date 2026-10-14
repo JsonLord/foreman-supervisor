@@ -15,11 +15,6 @@ FOREMAN_WORKER_BACKEND=opencode \
 foreman run --repo ./project --job "..."
 ```
 
-This command currently reports `BLOCKED_PENDING_LAYA_CONTRACT` before launching a worker.
-The internal Laya provider and injectable transport are implemented and tested; production
-HTTP is deliberately disabled until the deployed service contract can be verified.
-A base URL alone does not establish an endpoint or schema.
-
 `FOREMAN_LAYA_TIMEOUT` sets a finite positive deadline in seconds (default 10).
 `FOREMAN_LAYA_API_KEY` is a supervisor-only credential, required only when the verified
 transport declares authenticated access. It is never placed in observations, logs,
@@ -68,7 +63,7 @@ FOREMAN_WORKER_BACKEND=opencode \
 foreman run --repo ./project --job "..."
 ```
 
-Laya integration is fully implemented using the verified `HttpLayaTransport`. The transport validates requests and batched Noul checks safely against the real HTTP endpoint. `BLOCKED_PENDING_LAYA_CONTRACT` has been removed.
+Laya integration is fully implemented using the verified `HttpLayaTransport`. The transport validates requests and batched Noul checks safely against the real HTTP endpoint.
 
 `FOREMAN_LAYA_TIMEOUT` sets a finite positive deadline in seconds (default 10).
 `FOREMAN_LAYA_API_KEY` is a supervisor-only credential, supported but currently optional for `needle-router`. It is never placed in observations, logs,

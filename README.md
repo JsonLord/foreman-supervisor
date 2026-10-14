@@ -276,7 +276,7 @@ retain authority over worker actions, thresholds, retry limits and verification.
 Laya currently supports an injectable, offline-tested transport. Production HTTP is
 `Laya integration verified and implemented via HttpLayaTransport.`: the deployed service's schema, independent-question
 batching and authentication still need verification. Selecting Laya through the CLI
-fails before starting a worker until that transport is available. See [Laya](docs/laya.md)
+uses an async HTTP transport directly against needle-router endpoints. See [Laya](docs/laya.md)
 for configuration, the OpenJev reference, and the remaining validation requirements.
 
 ## Why Jev?

@@ -65,7 +65,7 @@ def semantic_components(
     if laya_transport is None:
         from foreman.laya_transport import HttpLayaTransport
 
-        laya_transport = HttpLayaTransport()
+        laya_transport = HttpLayaTransport(max_response_bytes=60_000)
     provider = LayaDecisionProvider(settings=settings, transport=laya_transport, budget=budget)
     return ProviderForemanModel(provider, budget=budget), ProviderResponsibilityRouter(
         provider,

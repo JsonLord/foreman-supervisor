@@ -79,12 +79,8 @@ async def test_duplicate_key_handling():
     )
     request = AssessmentRequest(evidence=evidence, questions={"key1": "test"})
 
-    result = await transport.assess(request, settings=settings)
-    assert len(result.probabilities) == 2
-    assert result.probabilities[0][0] == "key1"
-    assert result.probabilities[1][0] == "key1"
-    assert result.probabilities[0][1] == 0.5
-    assert result.probabilities[1][1] == 0.9
+    with pytest.raises(LayaTransportError):
+        await transport.assess(request, settings=settings)
 
 
 @pytest.mark.asyncio
